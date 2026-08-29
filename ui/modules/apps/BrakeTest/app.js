@@ -29,9 +29,10 @@ angular.module('beamng.apps')
       $scope.btInputRecordMph = null;
       $scope.btInputCoastMph = 2.0;
       $scope.btInputSteerAmt = 0.0;
-      $scope.btSteerMode = 'after';
-      $scope.btInputSteerOffset = 0.0;
-      $scope.btInputSteerSpeed = 0.0;
+      // Single absolute trigger speed. 0 = steering never engages.
+      // Lua takes exactly one number (setSteerParams trigger); the old
+      // before/after mode only changed how the UI computed it.
+      $scope.btInputSteerAtMph = 0.0;
       $scope.btEnableTurning = false;
       $scope.btAutoTest = false;
       // Settings panel collapsed by default — HUD shows only the live readout.
@@ -42,6 +43,77 @@ angular.module('beamng.apps')
       // Ensure the GE bridge extension is loaded. BeamNG does not auto-execute
       // GE extensions from Unpacked mods; extensions.load() makes it a live global.
       bngApi.engineLua('extensions.load("brakeTestUI")');
+
+      var LUA_PREFIX = 'if not brakeTestUI then extensions.load("brakeTestUI") end; ';
+
+      // Reads every input, clamps it, writes the clamped value back to the
+      // field, and returns the numbers Lua needs. Returns null when Brake at
+      // is unset (nothing valid to push).
+      function readClampedParams() {
+        var brakeMph = parseFloat($scope.btInputBrakeMph);
+        if (isNaN(brakeMph) || brakeMph <= 0) return null;
+
+        var recordMph = parseFloat($scope.btInputRecordMph);
+        if (isNaN(recordMph)) recordMph = brakeMph;
+        if (recordMph > brakeMph) recordMph = brakeMph;
+        if (recordMph < 0) recordMph = 0;
+
+        var coastMph = parseFloat($scope.btInputCoastMph);
+        if (isNaN(coastMph)) coastMph = 2.0;
+        if (coastMph < 0) coastMph = 0;
+        if (coastMph > 5) coastMph = 5;
+
+        var steerAmt = parseFloat($scope.btInputSteerAmt) || 0;
+        if (steerAmt < -1) steerAmt = -1;
+        if (steerAmt > 1) steerAmt = 1;
+
+        // Steering can engage any time during coast or braking, so the
+        // highest useful trigger is the speed the car lifts at.
+        var steerAtMph = parseFloat($scope.btInputSteerAtMph) || 0;
+        var steerAtMax = brakeMph + coastMph;
+        if (steerAtMph < 0) steerAtMph = 0;
+        if (steerAtMph > steerAtMax) steerAtMph = steerAtMax;
+
+        var telemetryHz = parseFloat($scope.btInputTelemetryHz) || 0;
+        if (telemetryHz < 0) telemetryHz = 0;
+        if (telemetryHz > 2000) telemetryHz = 2000;
+
+        $scope.btInputRecordMph  = recordMph;
+        $scope.btInputCoastMph   = coastMph;
+        $scope.btInputSteerAmt   = steerAmt;
+        $scope.btInputSteerAtMph = steerAtMph;
+        $scope.btInputTelemetryHz = telemetryHz;
+
+        return {
+          brakeMph: brakeMph, recordMph: recordMph, coastMph: coastMph,
+          steerAmt: steerAmt, steerAtMph: steerAtMph, telemetryHz: telemetryHz
+        };
+      }
+
+      // The ONE place that sends settings to Lua. Used by Apply, START RUN,
+      // preset load, and vehicle focus change so they can never disagree.
+      $scope.pushAllParams = function () {
+        var p = readClampedParams();
+        if (p) {
+          bngApi.engineLua(LUA_PREFIX +
+            'brakeTestUI.setTestParams(' + p.brakeMph + ', ' + p.recordMph + ', ' + p.coastMph + '); ' +
+            'brakeTestUI.setSteerParams(' + p.steerAmt + ', ' + p.steerAtMph + '); ' +
+            'brakeTestUI.setTelemetryHz(' + p.telemetryHz + ')');
+        }
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setTurningEnabled(' + ($scope.btEnableTurning ? 'true' : 'false') + ')');
+        // Deliberately NOT setAutoTestEnabled here: Lua resets autoState to
+        // "finished" on every call, which would abort a run in progress when
+        // START/STOP RUN re-pushes params. Only toggleAutoTest sends it.
+      };
+
+      $scope.applySettings = function () { $scope.pushAllParams(); };
+
+      // Old "Before" mode: steering already held when the measurement window opens.
+      $scope.fillSteerAtFromRecord = function () {
+        var recordMph = parseFloat($scope.btInputRecordMph);
+        if (isNaN(recordMph)) recordMph = parseFloat($scope.btInputBrakeMph) || 0;
+        $scope.btInputSteerAtMph = Math.round((recordMph + 0.5) * 10) / 10;
+      };
 
       // Receive Lua push (5Hz + immediate on state change)
       $scope.$on('brakeTestUpdate', function (event, data) {
@@ -72,69 +144,24 @@ angular.module('beamng.apps')
         });
       });
 
-      // Send target speed to GE bridge → vehicle Lua.
-      // The only number extraction: parseFloat on the raw input field value.
-      // No arithmetic, no unit conversion — GE Lua does mph→m/s.
-      $scope.setTarget = function () {
-        var brakeMph = parseFloat($scope.btInputBrakeMph);
-        var recordMph = parseFloat($scope.btInputRecordMph);
-        var coastMph = parseFloat($scope.btInputCoastMph);
-        var telemetryHz = parseFloat($scope.btInputTelemetryHz) || 0;
-
-        if (!isNaN(brakeMph) && brakeMph > 0) {
-          if (isNaN(recordMph)) recordMph = brakeMph;
-          if (isNaN(coastMph)) coastMph = 2.0;
-
-          if (recordMph > brakeMph) recordMph = brakeMph;
-          if (coastMph < 0) coastMph = 0;
-          if (coastMph > 5) coastMph = 5;
-
-          $scope.btInputRecordMph = recordMph;
-          $scope.btInputCoastMph = coastMph;
-
-          var steerAmt = parseFloat($scope.btInputSteerAmt) || 0;
-          var steerMode = $scope.btSteerMode;
-          var steerOffset = parseFloat($scope.btInputSteerOffset) || 0;
-          var steerSpeed = parseFloat($scope.btInputSteerSpeed) || 0;
-
-          var actualSteerTriggerMph = 0;
-          if (steerMode === 'before') {
-            if (steerOffset > 1) steerOffset = 1;
-            if (steerOffset < 0) steerOffset = 0;
-            $scope.btInputSteerOffset = steerOffset;
-            actualSteerTriggerMph = recordMph + steerOffset;
-          } else {
-            if (steerSpeed > recordMph) steerSpeed = recordMph;
-            if (steerSpeed < 0) steerSpeed = 0;
-            $scope.btInputSteerSpeed = steerSpeed;
-            actualSteerTriggerMph = steerSpeed;
-          }
-          if (steerAmt < -1.0) steerAmt = -1.0;
-          if (steerAmt > 1.0) steerAmt = 1.0;
-          $scope.btInputSteerAmt = steerAmt;
-
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setTestParams(' + brakeMph + ', ' + recordMph + ', ' + coastMph + ')');
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setSteerParams(' + steerAmt + ', ' + actualSteerTriggerMph + ')');
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setTelemetryHz(' + telemetryHz + ')');
-        }
-      };
-
       $scope.toggleTurning = function () {
-        bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setTurningEnabled(' + ($scope.btEnableTurning ? 'true' : 'false') + ')');
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setTurningEnabled(' + ($scope.btEnableTurning ? 'true' : 'false') + ')');
       };
 
       $scope.toggleAutoTest = function () {
-        if ($scope.btAutoTest) {
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setAutoTestEnabled(true)');
-        } else {
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setAutoTestEnabled(false)');
+        // Turning off automation also turns off scripted steering: Lua only
+        // applies it inside the automated state machine, so leaving the box
+        // checked would be a lie.
+        if (!$scope.btAutoTest && $scope.btEnableTurning) {
+          $scope.btEnableTurning = false;
+          $scope.toggleTurning();
         }
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setAutoTestEnabled(' + ($scope.btAutoTest ? 'true' : 'false') + ')');
       };
 
       $scope.toggleRun = function () {
-        $scope.setTarget();
-        $scope.toggleTurning();
-        bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.toggleAutoTestRun()');
+        $scope.pushAllParams();
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.toggleAutoTestRun()');
       };
 
       // Memory System Logic (Double-layer: LocalStorage + File)
@@ -161,43 +188,50 @@ angular.module('beamng.apps')
       $scope.memoryClick = function(idx) {
         if ($scope.saveMode) {
           $scope.presets[idx] = {
-            record: $scope.btInputRecordMph,
-            brake: $scope.btInputBrakeMph,
-            coast: $scope.btInputCoastMph,
-            steer: $scope.btInputSteerAmt,
-            mode: $scope.btSteerMode,
-            offset: $scope.btInputSteerOffset,
-            speed: $scope.btInputSteerSpeed,
+            brake:       $scope.btInputBrakeMph,
+            record:      $scope.btInputRecordMph,
+            coast:       $scope.btInputCoastMph,
+            steer:       $scope.btInputSteerAmt,
+            steerAt:     $scope.btInputSteerAtMph,
             turnEnabled: $scope.btEnableTurning,
-            autoTest: $scope.btAutoTest,
+            autoTest:    $scope.btAutoTest,
             telemetryHz: $scope.btInputTelemetryHz
           };
           var jsonStr = JSON.stringify($scope.presets);
           window.localStorage.setItem('brakeTestPresets', jsonStr);
-          
+
           // Write to dedicated file backup
           var escapedJson = jsonStr.replace(/'/g, "\\'");
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.savePresets(\'' + escapedJson + '\')');
+          bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.savePresets(\'' + escapedJson + '\')');
 
           $scope.saveMode = false;
         } else {
           var p = $scope.presets[idx];
           if (p) {
+            $scope.btInputBrakeMph  = parseFloat(p.brake)  || 0;
             $scope.btInputRecordMph = parseFloat(p.record) || 0;
-            $scope.btInputBrakeMph = parseFloat(p.brake) || 0;
-            $scope.btInputCoastMph = parseFloat(p.coast) || 0;
-            $scope.btInputSteerAmt = parseFloat(p.steer) || 0;
-            $scope.btSteerMode = p.mode || 'after';
-            $scope.btInputSteerOffset = parseFloat(p.offset) || 0;
-            $scope.btInputSteerSpeed = parseFloat(p.speed) || 0;
+            $scope.btInputCoastMph  = parseFloat(p.coast)  || 0;
+            $scope.btInputSteerAmt  = parseFloat(p.steer)  || 0;
             $scope.btInputTelemetryHz = parseFloat(p.telemetryHz) || 0;
-            
-            $scope.btEnableTurning = (p.turnEnabled === true || p.turnEnabled === 'true');
-            $scope.btAutoTest = (p.autoTest === true || p.autoTest === 'true');
-            
-            $scope.setTarget();
-            $scope.toggleTurning();
-            $scope.toggleAutoTest();
+
+            if (p.steerAt !== undefined) {
+              $scope.btInputSteerAtMph = parseFloat(p.steerAt) || 0;
+            } else {
+              // Presets saved before Steer at existed stored a mode plus
+              // either an offset above Record (before) or an absolute speed (after).
+              var rec = parseFloat(p.record) || 0;
+              if (p.mode === 'before') {
+                $scope.btInputSteerAtMph = rec + (parseFloat(p.offset) || 0);
+              } else {
+                $scope.btInputSteerAtMph = parseFloat(p.speed) || 0;
+              }
+            }
+
+            $scope.btAutoTest      = (p.autoTest === true || p.autoTest === 'true');
+            $scope.btEnableTurning = $scope.btAutoTest && (p.turnEnabled === true || p.turnEnabled === 'true');
+
+            $scope.pushAllParams();
+            $scope.toggleAutoTest();   // arms/disarms Lua automation to match the loaded preset
           }
         }
       };
@@ -205,29 +239,9 @@ angular.module('beamng.apps')
       // On vehicle focus change: re-push current target to new vehicle,
       // clear stale result display (results belong to the previous vehicle).
       $scope.$on('VehicleFocusChanged', function () {
-        var brakeMph = parseFloat($scope.btInputBrakeMph);
-        if (!isNaN(brakeMph) && brakeMph > 0) {
-          var recordMph = parseFloat($scope.btInputRecordMph) || brakeMph;
-          var coastMph = parseFloat($scope.btInputCoastMph) || 0;
-          var telemetryHz = parseFloat($scope.btInputTelemetryHz) || 0;
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setTestParams(' + brakeMph + ', ' + recordMph + ', ' + coastMph + '); brakeTestUI.setTurningEnabled(' + ($scope.btEnableTurning ? 'true' : 'false') + '); brakeTestUI.setTelemetryHz(' + telemetryHz + ')');
-          
-          var steerAmt = parseFloat($scope.btInputSteerAmt) || 0;
-          var steerMode = $scope.btSteerMode;
-          var steerOffset = parseFloat($scope.btInputSteerOffset) || 0;
-          var steerSpeed = parseFloat($scope.btInputSteerSpeed) || 0;
-          var actualSteerTriggerMph = 0;
-          if (steerMode === 'before') {
-            actualSteerTriggerMph = recordMph + steerOffset;
-          } else {
-            actualSteerTriggerMph = steerSpeed;
-          }
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setSteerParams(' + steerAmt + ', ' + actualSteerTriggerMph + ')');
-        } else {
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setTurningEnabled(' + ($scope.btEnableTurning ? 'true' : 'false') + ')');
-        }
+        $scope.pushAllParams();
         if ($scope.btAutoTest) {
-          bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.setAutoTestEnabled(true)');
+          bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setAutoTestEnabled(true)');
         }
         $scope.$evalAsync(function () {
           $scope.btData.dist_m = null;
