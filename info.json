@@ -1,0 +1,9 @@
+{
+    "name": "BrakeTest",
+    "authors": "Blake",
+    "version": "1.0.0",
+    "tagid": "brake_test",
+    "tags": ["brake", "telemetry", "ui"],
+    "description": "Passive brake event measurement: stopping distance, average G-force, and duration from a user-set target speed. All calculations run in vehicle Lua at 2kHz.",
+    "requires_engine_version": "0.37"
+}

@@ -1,0 +1,344 @@
+<div class="bngApp brakeTestRoot">
+  <style>
+    .brakeTestRoot {
+      width: 100%;
+      height: 100%;
+      background: rgba(30, 30, 30, 0.88);
+      color: #f0f0f0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      box-sizing: border-box;
+      padding: 7px 10px 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      container-type: size;
+      overflow-y: auto;
+      overflow-x: hidden;
+      /* Reserve gutter so a scrollbar appearing never reflows content width */
+      scrollbar-gutter: stable;
+    }
+    .brakeTestRoot::-webkit-scrollbar { width: 6px; }
+    .brakeTestRoot::-webkit-scrollbar-track { background: transparent; }
+    .brakeTestRoot::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 3px; }
+    .btHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .btTitle {
+      font-size: min(13cqh, 6cqw);
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      color: #ffffff;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .btGearBtn {
+      display: flex;
+      align-items: center;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.20);
+      color: #cccccc;
+      border-radius: 3px;
+      cursor: pointer;
+      padding: 1px 4px;
+      flex-shrink: 0;
+    }
+    .btGearBtn:hover { background: rgba(255,255,255,0.18); color: #ffffff; }
+    .btGearBtn.open {
+      background: rgba(80,160,255,0.30);
+      border-color: rgba(80,160,255,0.55);
+      color: #ffffff;
+    }
+    .btGearBtn .material-icons { font-size: min(12cqh, 5.5cqw); }
+    .btRow {
+      font-size: min(11cqh, 5.2cqw);
+      line-height: 1.25;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btLabel { color: #999999; }
+    .btVal   { color: #ffffff; font-weight: 600; font-variant-numeric: tabular-nums; }
+    /* State color coding */
+    .btState-idle      { color: #888888; font-weight: 600; }
+    .btState-waiting   { color: #f0c040; font-weight: 600; }
+    .btState-measuring { color: #40c0f0; font-weight: 600; }
+    /* Divider */
+    .btDivider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.12);
+      margin: 1px 0;
+      flex-shrink: 0;
+    }
+    /* Collapsible settings panel */
+    .btSettings {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    /* Form Grid Layout */
+    .btGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 4px;
+      margin-bottom: 2px;
+    }
+    .btGrid > .btInputGroup:nth-child(3) {
+      grid-column: span 2;
+    }
+    .btInputGroup {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .btInputLabel {
+      font-size: min(9cqh, 4.2cqw);
+      color: #999999;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .btMphInput {
+      width: 100%;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.20);
+      color: #ffffff;
+      padding: 3px 2px;
+      font-size: min(10cqh, 4.8cqw);
+      font-family: inherit;
+      text-align: center;
+      outline: none;
+      border-radius: 3px;
+      transition: border-color 0.15s;
+      box-sizing: border-box;
+    }
+    .btMphInput:focus { border-color: rgba(80,160,255,0.7); }
+
+    .btTimingBtn {
+      background: rgba(255,255,255,0.12);
+      cursor: pointer;
+      color: #ffffff;
+      font-weight: 500;
+    }
+    .btTimingBtn:hover { background: rgba(255,255,255,0.20); }
+
+    .btSetBtnFull {
+      width: 100%;
+      background: rgba(80,160,255,0.25);
+      border: 1px solid rgba(80,160,255,0.50);
+      color: #ffffff;
+      padding: 4px 0;
+      font-size: min(10cqh, 4.8cqw);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.15s;
+      margin-bottom: 4px;
+    }
+    .btSetBtnFull:hover { background: rgba(80,160,255,0.40); }
+
+    .btCheckboxRow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      margin-top: 2px;
+    }
+    .btCheckboxRow input { margin: 0; cursor: pointer; }
+    .btCheckboxLabel {
+      font-size: min(10cqh, 4.8cqw);
+      color: #dddddd;
+      user-select: none;
+    }
+
+    .btMemoryGrid {
+      display: flex;
+      gap: 3px;
+      margin-top: 4px;
+      margin-bottom: 2px;
+    }
+    .btMemBtn {
+      flex: 1;
+      padding: 2px 0;
+      border-radius: 2px;
+      font-size: min(9cqh, 4.5cqw);
+      font-weight: bold;
+      color: #ffffff;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.2);
+      transition: background 0.1s;
+    }
+
+    .btBigStartBtn {
+      width: 100%;
+      margin-top: 4px;
+      padding: 4px 0;
+      font-size: min(11cqh, 5.2cqw);
+      font-weight: bold;
+      border-radius: 3px;
+      cursor: pointer;
+      border: 1px solid;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      flex-shrink: 0;
+    }
+  </style>
+
+  <!-- Header: title + settings toggle -->
+  <div class="btHeader">
+    <div class="btTitle">Brake Test</div>
+    <button class="btGearBtn" ng-class="{ open: showSettings }" ng-click="showSettings = !showSettings" title="Settings">
+      <span class="material-icons">{{ showSettings ? 'expand_less' : 'settings' }}</span>
+    </button>
+  </div>
+
+  <!-- State + current target -->
+  <div class="btRow">
+    <span class="btLabel">State:&nbsp;</span><span ng-class="'btState-' + btData.state">{{ btData.state }}</span>
+    <span class="btLabel" ng-if="btData.target_mph !== '--'">&nbsp;&nbsp;Target:&nbsp;<span class="btVal">{{ btData.target_mph }}</span>&nbsp;mph</span>
+  </div>
+
+  <!-- Start/stop stays above the result block so it never jumps when results appear -->
+  <button class="btBigStartBtn"
+          ng-if="btAutoTest"
+          ng-click="toggleRun()"
+          style="background: {{(btData.auto_state === 'accelerating' || btData.auto_state === 'coasting' || btData.auto_state === 'braking') ? 'rgba(255,80,80,0.35)' : 'rgba(80,255,80,0.35)'}}; border-color: {{(btData.auto_state === 'accelerating' || btData.auto_state === 'coasting' || btData.auto_state === 'braking') ? 'rgba(255,80,80,0.7)' : 'rgba(80,255,80,0.7)'}}">
+    {{(btData.auto_state === 'accelerating' || btData.auto_state === 'coasting' || btData.auto_state === 'braking') ? 'STOP RUN' : 'START RUN'}}
+  </button>
+
+  <!-- Settings panel — collapsed by default; ng-show (not ng-if) keeps ng-model bindings on the controller scope -->
+  <div class="btSettings" ng-show="showSettings">
+    <hr class="btDivider" />
+
+    <!-- Speed Config -->
+    <div class="btGrid">
+      <div class="btInputGroup">
+        <span class="btInputLabel">Record</span>
+        <input class="btMphInput" type="number" min="1" max="200" ng-model="btInputRecordMph">
+      </div>
+      <div class="btInputGroup">
+        <span class="btInputLabel">Brake</span>
+        <input class="btMphInput" type="number" min="1" max="200" ng-model="btInputBrakeMph">
+      </div>
+      <div class="btInputGroup">
+        <span class="btInputLabel">Coast</span>
+        <input class="btMphInput" type="number" min="0" max="5" step="0.1" ng-model="btInputCoastMph">
+      </div>
+    </div>
+
+    <!-- Steer Config -->
+    <div class="btGrid">
+      <div class="btInputGroup">
+        <span class="btInputLabel">Steer</span>
+        <input class="btMphInput" type="number" min="-1.0" max="1.0" step="0.1" ng-model="btInputSteerAmt">
+      </div>
+      <div class="btInputGroup">
+        <span class="btInputLabel">Timing</span>
+        <button class="btMphInput btTimingBtn" ng-click="btSteerMode = (btSteerMode === 'after' ? 'before' : 'after')">
+          {{ btSteerMode === 'after' ? 'After' : 'Before' }}
+        </button>
+      </div>
+      <div class="btInputGroup">
+        <span class="btInputLabel">At (mph)</span>
+        <input class="btMphInput" type="number" min="0" max="1" step="0.1" ng-model="btInputSteerOffset" ng-show="btSteerMode === 'before'" placeholder="Offset">
+        <input class="btMphInput" type="number" min="0" step="1" ng-model="btInputSteerSpeed" ng-show="btSteerMode === 'after'" placeholder="Speed">
+      </div>
+    </div>
+
+    <!-- Telemetry Config -->
+    <div class="btGrid" style="margin-top: 4px;">
+      <div class="btInputGroup">
+        <span class="btInputLabel">Telemetry (Hz)</span>
+        <input class="btMphInput" type="number" min="0" max="2000" ng-model="btInputTelemetryHz" placeholder="0 = off">
+      </div>
+    </div>
+
+    <!-- Apply Settings -->
+    <button class="btSetBtnFull" ng-click="setTarget()">Apply Settings</button>
+
+    <!-- Memory System -->
+    <div class="btMemoryGrid">
+      <button ng-repeat="i in [1,2,3,4,5,6]"
+              class="btMemBtn"
+              ng-click="memoryClick(i)"
+              style="background: {{ presets[i] ? (saveMode ? 'rgba(255,80,80,0.35)' : 'rgba(80,160,255,0.30)') : (saveMode ? 'rgba(255,80,80,0.35)' : 'rgba(255,255,255,0.08)') }}; border-color: {{ saveMode ? 'rgba(255,80,80,0.6)' : 'rgba(80,160,255,0.5)' }}">
+        {{ i }}
+      </button>
+      <button class="btMemBtn"
+              ng-click="toggleSaveMode()"
+              style="background: {{ saveMode ? 'rgba(255,80,80,0.6)' : 'rgba(255,255,255,0.1)' }}; font-size: min(8cqh, 3.8cqw);">
+        SET
+      </button>
+    </div>
+    <hr class="btDivider" style="margin-bottom: 2px;" />
+
+    <!-- Toggles & Automation -->
+    <div>
+      <label class="btCheckboxRow">
+        <input type="checkbox" ng-model="btEnableTurning" ng-change="toggleTurning()" />
+        <span class="btCheckboxLabel">Take into account turning</span>
+      </label>
+
+      <label class="btCheckboxRow">
+        <input type="checkbox" ng-model="btAutoTest" ng-change="toggleAutoTest()" />
+        <span class="btCheckboxLabel">Automate Brake Testing</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Last result block — hidden until first test completes (Lua only sends dist_m when result exists).
+       Kept below the controls so its appearance never displaces anything clickable. -->
+  <hr class="btDivider" ng-if="btData.dist_m" />
+  <div ng-if="btData.dist_m">
+    <div class="btRow">
+      <span class="btLabel">Dist (Chord):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.dist_m }}</span><span class="btLabel">&nbsp;m&nbsp;/&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.dist_ft }}</span><span class="btLabel">&nbsp;ft</span>
+    </div>
+    <div class="btRow">
+      <span class="btLabel">Avg G (Chord):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.avg_g }}</span><span class="btLabel">&nbsp;g</span>
+    </div>
+    <div ng-if="btData.arc_dist_m">
+      <div class="btRow">
+        <span class="btLabel">True Path (Arc):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.arc_dist_m }}</span><span class="btLabel">&nbsp;m&nbsp;/&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.arc_dist_ft }}</span><span class="btLabel">&nbsp;ft</span>
+      </div>
+      <div class="btRow">
+        <span class="btLabel">Avg G (Arc):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.arc_avg_g }}</span><span class="btLabel">&nbsp;g</span>
+      </div>
+    </div>
+    <div class="btRow">
+      <span class="btLabel">Time:&nbsp;</span><span class="btVal">{{ btData.duration_s }}</span><span class="btLabel">&nbsp;s&nbsp;&nbsp;from&nbsp;</span><span class="btVal">{{ btData.start_speed_mph }}</span><span class="btLabel">&nbsp;mph</span>
+    </div>
+    <div ng-if="btData.avg_steer_input">
+      <hr class="btDivider" />
+      <div class="btRow"><span class="btLabel">Steer input:&nbsp;</span><span class="btVal">{{ btData.avg_steer_input }}</span></div>
+      <div class="btRow"><span class="btLabel">Wheel angle:&nbsp;</span><span class="btVal">{{ btData.avg_wheel_angle }}</span><span class="btLabel">&nbsp;deg</span></div>
+      <div class="btRow"><span class="btLabel">Understeer:&nbsp;</span><span class="btVal">{{ btData.understeer }}</span><span class="btLabel">&nbsp;deg</span></div>
+      <div class="btRow"><span class="btLabel">Achieved yaw:&nbsp;</span><span class="btVal">{{ btData.achieved_yaw }}</span><span class="btLabel">&nbsp;deg</span></div>
+      <div ng-if="btData.turning_enabled && btData.acs_score">
+        <hr class="btDivider" />
+        <div class="btRow" style="margin-top: 4px;">
+          <span class="btLabel" style="font-size: min(12cqh, 5.5cqw); font-weight: bold; color: #ffffff;">ACS Score:&nbsp;</span>
+          <span class="btVal" style="font-size: min(13cqh, 6cqw);" ng-style="{ 'color': 'hsl(' + (btData.acs_score * 1.2) + ', 100%, 60%)' }">
+            {{ btData.acs_score }}
+          </span>
+        </div>
+      </div>
+    </div>
+    <div ng-if="btData.bf_avg">
+      <hr class="btDivider" />
+      <div class="btRow" style="margin-bottom: 2px;"><span class="btLabel" style="font-size: min(10cqh, 4.8cqw); font-weight: bold; color: #ffffff;">Brake Torque (Nm):</span></div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 2px; font-size: min(9cqh, 4.3cqw);">
+        <div></div><div class="btLabel" style="text-align: right;">Avg</div><div class="btLabel" style="text-align: right;">Max</div><div class="btLabel" style="text-align: right;">Min</div>
+        <div class="btLabel">FL</div><div class="btVal" style="text-align: right;">{{ btData.bf_avg.FL }}</div><div class="btVal" style="text-align: right;">{{ btData.bf_max.FL }}</div><div class="btVal" style="text-align: right;">{{ btData.bf_min.FL }}</div>
+        <div class="btLabel">FR</div><div class="btVal" style="text-align: right;">{{ btData.bf_avg.FR }}</div><div class="btVal" style="text-align: right;">{{ btData.bf_max.FR }}</div><div class="btVal" style="text-align: right;">{{ btData.bf_min.FR }}</div>
+        <div class="btLabel">RL</div><div class="btVal" style="text-align: right;">{{ btData.bf_avg.RL }}</div><div class="btVal" style="text-align: right;">{{ btData.bf_max.RL }}</div><div class="btVal" style="text-align: right;">{{ btData.bf_min.RL }}</div>
+        <div class="btLabel">RR</div><div class="btVal" style="text-align: right;">{{ btData.bf_avg.RR }}</div><div class="btVal" style="text-align: right;">{{ btData.bf_max.RR }}</div><div class="btVal" style="text-align: right;">{{ btData.bf_min.RR }}</div>
+      </div>
+    </div>
+  </div>
+
+</div>

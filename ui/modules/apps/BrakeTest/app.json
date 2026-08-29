@@ -1,0 +1,17 @@
+{
+  "name": "Brake Test",
+  "description": "Passive brake event measurement: stopping distance, avg G-force, and duration from a user-set target speed.",
+  "author": "Blake",
+  "version": "1.0",
+  "domElement": "<brake-test></brake-test>",
+  "directive": "brakeTest",
+  "category": "Telemetry",
+  "types": ["ui.apps.categories.vehicle_profiling"],
+  "isAuxiliary": false,
+  "css": {
+    "left": "0px",
+    "top": "0px",
+    "width": "320px",
+    "height": "210px"
+  }
+}
