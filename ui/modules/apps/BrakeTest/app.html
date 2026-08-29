@@ -312,17 +312,17 @@
   <hr class="btDivider" ng-if="btData.dist_m" />
   <div ng-if="btData.dist_m">
     <div class="btRow">
-      <span class="btLabel">Dist (Chord):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.dist_m }}</span><span class="btLabel">&nbsp;m&nbsp;/&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.dist_ft }}</span><span class="btLabel">&nbsp;ft</span>
+      <span class="btLabel">Distance (chord):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.dist_m }}</span><span class="btLabel">&nbsp;m&nbsp;/&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.dist_ft }}</span><span class="btLabel">&nbsp;ft</span>
     </div>
     <div class="btRow">
-      <span class="btLabel">Avg G (Chord):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.avg_g }}</span><span class="btLabel">&nbsp;g</span>
+      <span class="btLabel">Avg G (chord):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.avg_g }}</span><span class="btLabel">&nbsp;g</span>
     </div>
     <div ng-if="btData.arc_dist_m">
       <div class="btRow">
-        <span class="btLabel">True Path (Arc):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.arc_dist_m }}</span><span class="btLabel">&nbsp;m&nbsp;/&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.arc_dist_ft }}</span><span class="btLabel">&nbsp;ft</span>
+        <span class="btLabel">Distance (true path):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.arc_dist_m }}</span><span class="btLabel">&nbsp;m&nbsp;/&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.arc_dist_ft }}</span><span class="btLabel">&nbsp;ft</span>
       </div>
       <div class="btRow">
-        <span class="btLabel">Avg G (Arc):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.arc_avg_g }}</span><span class="btLabel">&nbsp;g</span>
+        <span class="btLabel">Avg G (true path):&nbsp;</span><span class="btVal" style="color: #60ff60">{{ btData.arc_avg_g }}</span><span class="btLabel">&nbsp;g</span>
       </div>
     </div>
     <div class="btRow">
@@ -330,14 +330,14 @@
     </div>
     <div ng-if="btData.avg_steer_input">
       <hr class="btDivider" />
-      <div class="btRow"><span class="btLabel">Steer input:&nbsp;</span><span class="btVal">{{ btData.avg_steer_input }}</span></div>
-      <div class="btRow"><span class="btLabel">Wheel angle:&nbsp;</span><span class="btVal">{{ btData.avg_wheel_angle }}</span><span class="btLabel">&nbsp;deg</span></div>
+      <div class="btRow"><span class="btLabel">Avg steer (0&ndash;1):&nbsp;</span><span class="btVal">{{ btData.avg_steer_input }}</span></div>
+      <div class="btRow"><span class="btLabel">Avg wheel angle:&nbsp;</span><span class="btVal">{{ btData.avg_wheel_angle }}</span><span class="btLabel">&nbsp;deg</span></div>
       <div class="btRow"><span class="btLabel">Understeer:&nbsp;</span><span class="btVal">{{ btData.understeer }}</span><span class="btLabel">&nbsp;deg</span></div>
-      <div class="btRow"><span class="btLabel">Achieved yaw:&nbsp;</span><span class="btVal">{{ btData.achieved_yaw }}</span><span class="btLabel">&nbsp;deg</span></div>
+      <div class="btRow"><span class="btLabel">Heading change:&nbsp;</span><span class="btVal">{{ btData.achieved_yaw }}</span><span class="btLabel">&nbsp;deg</span></div>
       <div ng-if="btData.turning_enabled && btData.acs_score">
         <hr class="btDivider" />
         <div class="btRow" style="margin-top: 4px;">
-          <span class="btLabel" style="font-size: min(12cqh, 5.5cqw); font-weight: bold; color: #ffffff;">ACS Score:&nbsp;</span>
+          <span class="btLabel" style="font-size: min(12cqh, 5.5cqw); font-weight: bold; color: #ffffff;">Cornering score (ACS):&nbsp;</span>
           <span class="btVal" style="font-size: min(13cqh, 6cqw);" ng-style="{ 'color': 'hsl(' + (btData.acs_score * 1.2) + ', 100%, 60%)' }">
             {{ btData.acs_score }}
           </span>
