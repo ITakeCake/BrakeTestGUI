@@ -118,14 +118,6 @@
     }
     .btMphInput:focus { border-color: rgba(80,160,255,0.7); }
 
-    .btTimingBtn {
-      background: rgba(255,255,255,0.12);
-      cursor: pointer;
-      color: #ffffff;
-      font-weight: 500;
-    }
-    .btTimingBtn:hover { background: rgba(255,255,255,0.20); }
-
     .btSetBtnFull {
       width: 100%;
       background: rgba(80,160,255,0.25);
@@ -187,6 +179,33 @@
       letter-spacing: 0.1em;
       flex-shrink: 0;
     }
+
+    .btHint {
+      font-size: min(8.5cqh, 4cqw);
+      color: #8a8a8a;
+      line-height: 1.25;
+      white-space: normal;
+      margin: 1px 0 2px 0;
+    }
+    .btGroupTitle {
+      font-size: min(9cqh, 4.2cqw);
+      color: #bbbbbb;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 4px;
+    }
+    .btDisabledGroup { opacity: 0.4; pointer-events: none; }
+    .btInlineBtn {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #ffffff;
+      border-radius: 3px;
+      font-size: min(8.5cqh, 4cqw);
+      padding: 2px 4px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btInlineBtn:hover { background: rgba(255,255,255,0.2); }
   </style>
 
   <!-- Header: title + settings toggle -->
@@ -215,42 +234,53 @@
   <div class="btSettings" ng-show="showSettings">
     <hr class="btDivider" />
 
-    <!-- Speed Config -->
+    <!-- Speeds -->
     <div class="btGrid">
       <div class="btInputGroup">
-        <span class="btInputLabel">Record</span>
-        <input class="btMphInput" type="number" min="1" max="200" ng-model="btInputRecordMph">
-      </div>
-      <div class="btInputGroup">
-        <span class="btInputLabel">Brake</span>
+        <span class="btInputLabel">Brake at (mph)</span>
         <input class="btMphInput" type="number" min="1" max="200" ng-model="btInputBrakeMph">
       </div>
       <div class="btInputGroup">
-        <span class="btInputLabel">Coast</span>
+        <span class="btInputLabel">Record from (mph)</span>
+        <input class="btMphInput" type="number" min="0" max="200" ng-model="btInputRecordMph">
+      </div>
+      <div class="btInputGroup">
+        <span class="btInputLabel">Coast margin (mph)</span>
         <input class="btMphInput" type="number" min="0" max="5" step="0.1" ng-model="btInputCoastMph">
       </div>
     </div>
+    <div class="btHint">Accelerates to Brake at + Coast margin, lifts, brakes at Brake at, measures from Record from.</div>
 
-    <!-- Steer Config -->
-    <div class="btGrid">
-      <div class="btInputGroup">
-        <span class="btInputLabel">Steer</span>
-        <input class="btMphInput" type="number" min="-1.0" max="1.0" step="0.1" ng-model="btInputSteerAmt">
+    <!-- Automation -->
+    <label class="btCheckboxRow">
+      <input type="checkbox" ng-model="btAutoTest" ng-change="toggleAutoTest()" />
+      <span class="btCheckboxLabel">Automate run (car drives itself)</span>
+    </label>
+
+    <!-- Scripted steering: Lua only applies it inside the automated state machine -->
+    <div class="btGroupTitle">Automated run only</div>
+    <div ng-class="{ btDisabledGroup: !btAutoTest }">
+      <label class="btCheckboxRow">
+        <input type="checkbox" ng-model="btEnableTurning" ng-change="toggleTurning()" ng-disabled="!btAutoTest" />
+        <span class="btCheckboxLabel">Scripted steering</span>
+      </label>
+      <div class="btGrid" ng-class="{ btDisabledGroup: !btEnableTurning }">
+        <div class="btInputGroup">
+          <span class="btInputLabel">Steer amount (−1 … +1)</span>
+          <input class="btMphInput" type="number" min="-1" max="1" step="0.1" ng-model="btInputSteerAmt" ng-disabled="!btEnableTurning">
+        </div>
+        <div class="btInputGroup">
+          <span class="btInputLabel">Steer at (mph)</span>
+          <div style="display: flex; gap: 3px; align-items: stretch;">
+            <input class="btMphInput" type="number" min="0" step="0.1" ng-model="btInputSteerAtMph" ng-disabled="!btEnableTurning" placeholder="0 = never">
+            <button class="btInlineBtn" ng-click="fillSteerAtFromRecord()" ng-disabled="!btEnableTurning" title="Steering already held when measuring starts">= Record + 0.5</button>
+          </div>
+        </div>
       </div>
-      <div class="btInputGroup">
-        <span class="btInputLabel">Timing</span>
-        <button class="btMphInput btTimingBtn" ng-click="btSteerMode = (btSteerMode === 'after' ? 'before' : 'after')">
-          {{ btSteerMode === 'after' ? 'After' : 'Before' }}
-        </button>
-      </div>
-      <div class="btInputGroup">
-        <span class="btInputLabel">At (mph)</span>
-        <input class="btMphInput" type="number" min="0" max="1" step="0.1" ng-model="btInputSteerOffset" ng-show="btSteerMode === 'before'" placeholder="Offset">
-        <input class="btMphInput" type="number" min="0" step="1" ng-model="btInputSteerSpeed" ng-show="btSteerMode === 'after'" placeholder="Speed">
-      </div>
+      <div class="btHint">Steering holds from Steer at until stopped. &ge; Record from: held before measuring starts. &lt; Record from: begins mid-stop.</div>
     </div>
 
-    <!-- Telemetry Config -->
+    <!-- Telemetry -->
     <div class="btGrid" style="margin-top: 4px;">
       <div class="btInputGroup">
         <span class="btInputLabel">Telemetry (Hz)</span>
@@ -258,10 +288,10 @@
       </div>
     </div>
 
-    <!-- Apply Settings -->
-    <button class="btSetBtnFull" ng-click="setTarget()">Apply Settings</button>
+    <!-- Apply -->
+    <button class="btSetBtnFull" ng-click="applySettings()">Apply settings</button>
 
-    <!-- Memory System -->
+    <!-- Presets -->
     <div class="btMemoryGrid">
       <button ng-repeat="i in [1,2,3,4,5,6]"
               class="btMemBtn"
@@ -274,20 +304,6 @@
               style="background: {{ saveMode ? 'rgba(255,80,80,0.6)' : 'rgba(255,255,255,0.1)' }}; font-size: min(8cqh, 3.8cqw);">
         SET
       </button>
-    </div>
-    <hr class="btDivider" style="margin-bottom: 2px;" />
-
-    <!-- Toggles & Automation -->
-    <div>
-      <label class="btCheckboxRow">
-        <input type="checkbox" ng-model="btEnableTurning" ng-change="toggleTurning()" />
-        <span class="btCheckboxLabel">Take into account turning</span>
-      </label>
-
-      <label class="btCheckboxRow">
-        <input type="checkbox" ng-model="btAutoTest" ng-change="toggleAutoTest()" />
-        <span class="btCheckboxLabel">Automate Brake Testing</span>
-      </label>
     </div>
   </div>
 
