@@ -11,6 +11,16 @@ from the DynamicABS mod family since it has no dependency on ABS-controller inte
 - `lua/ge/extensions/absCmdChannel.lua` — command channel used by the automation/telemetry side
 - `ui/modules/apps/BrakeTest/` — the in-game Angular HUD app
 
+## Settings explained
+
+Full table with the Lua line each control maps to: [docs/GUI_TERMINOLOGY.md](docs/GUI_TERMINOLOGY.md).
+
+Short version — an automated run does: accelerate to **Brake at + Coast margin** → lift and
+coast → full brake at **Brake at** → measurement window opens at **Record from** → stop.
+**Scripted steering** (automated runs only) holds **Steer amount** from the moment speed
+drops to **Steer at** until the car stops. Set Steer at ≥ Record from to have the wheel
+already turned when measuring starts, or below it to turn mid-stop.
+
 ## How we calculate stopping distance
 
 This mod measures a stop directly: it samples position when the vehicle crosses
