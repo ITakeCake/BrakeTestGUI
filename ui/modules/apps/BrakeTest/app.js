@@ -108,13 +108,6 @@ angular.module('beamng.apps')
 
       $scope.applySettings = function () { $scope.pushAllParams(); };
 
-      // Old "Before" mode: steering already held when the measurement window opens.
-      $scope.fillSteerAtFromRecord = function () {
-        var recordMph = parseFloat($scope.btInputRecordMph);
-        if (isNaN(recordMph)) recordMph = parseFloat($scope.btInputBrakeMph) || 0;
-        $scope.btInputSteerAtMph = Math.round((recordMph + 0.5) * 10) / 10;
-      };
-
       // Receive Lua push (5Hz + immediate on state change)
       $scope.$on('brakeTestUpdate', function (event, data) {
         $scope.$evalAsync(function () {

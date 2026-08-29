@@ -12,8 +12,7 @@ If the HUD and this table disagree, the HUD is wrong.
 | Automate run (checkbox) | `btAutoTest` | `autoTestEnabled` (`:758`) | Car drives itself: accelerate → coast → brake → stop. Shows START/STOP RUN. |
 | Scripted steering (checkbox, "Automated run only" group) | `btEnableTurning` | `turningEnabled` (`:753`) | When on **and** the run is automated, the auto-driver holds Steer amount once speed ≤ Steer at (`:368,387`). Also forces the cornering score on (`:627`). Disabled/greyed unless Automate run is checked. |
 | Steer amount (−1 … +1) | `btInputSteerAmt` | `steerAmount` (`:730`) | Steering input held from trigger until the car stops (`:257`). Sign = BeamNG steering axis; direction not yet confirmed in-game. |
-| Steer at (mph) | `btInputSteerAtMph` | `steerTriggerSpeed` (`:731`; m/s) | Steering engages the first physics step speed ≤ this, during coast or braking (`:368,387`). 0 = never. Clamped 0 … Brake at + Coast margin. |
-| "= Record + 0.5" button | — | — | Fills Steer at with Record from + 0.5, so steering is already held when the measurement window opens. |
+| Steer at (mph) | `btInputSteerAtMph` | `steerTriggerSpeed` (`:731`; m/s) | Steering engages the first physics step speed ≤ this, during coast or braking (`:368,387`). 0 = never. Clamped 0 … Brake at + Coast margin. Set ≥ Record from to have steering already held when the measurement window opens. |
 | Telemetry (Hz) | `btInputTelemetryHz` | `setTelemetryHz` (`brakeTestUI.lua`) | 2 kHz CSV stream rate, 0 = off. |
 | Apply settings | `applySettings()` | — | Pushes all of the above. |
 | Presets 1–6 / SET | — | — | Saves/loads the settings above under a slot. |

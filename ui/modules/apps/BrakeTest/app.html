@@ -195,17 +195,6 @@
       margin-top: 4px;
     }
     .btDisabledGroup { opacity: 0.4; pointer-events: none; }
-    .btInlineBtn {
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: #ffffff;
-      border-radius: 3px;
-      font-size: min(8.5cqh, 4cqw);
-      padding: 2px 4px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .btInlineBtn:hover { background: rgba(255,255,255,0.2); }
   </style>
 
   <!-- Header: title + settings toggle -->
@@ -271,10 +260,7 @@
         </div>
         <div class="btInputGroup">
           <span class="btInputLabel">Steer at (mph)</span>
-          <div style="display: flex; gap: 3px; align-items: stretch;">
-            <input class="btMphInput" type="number" min="0" step="0.1" ng-model="btInputSteerAtMph" ng-disabled="!btEnableTurning" placeholder="0 = never">
-            <button class="btInlineBtn" ng-click="fillSteerAtFromRecord()" ng-disabled="!btEnableTurning" title="Steering already held when measuring starts">= Record + 0.5</button>
-          </div>
+          <input class="btMphInput" type="number" min="0" step="0.1" ng-model="btInputSteerAtMph" ng-disabled="!btEnableTurning" placeholder="0 = never">
         </div>
       </div>
       <div class="btHint">Steering holds from Steer at until stopped. &ge; Record from: held before measuring starts. &lt; Record from: begins mid-stop.</div>
