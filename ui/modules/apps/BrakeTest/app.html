@@ -20,6 +20,12 @@
       user-select: none;
     }
 
+    /* .btBody is everything except the nav rail — it grows to fill whatever
+       height the app window actually is (the reported bug: with fixed/small
+       heights, a resized-taller window left a big empty area below). */
+    .brakeTestRoot .btBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .brakeTestRoot .btMainBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
     .brakeTestRoot .btNav {
       display: flex;
       justify-content: space-between;
@@ -27,7 +33,6 @@
       margin: 0.53cqh -0.89cqw -0.79cqh -0.89cqw;
       padding: 0.53cqh 0.89cqw;
       border-top: 1px solid rgba(255,255,255,0.07);
-      order: 2;
       flex-shrink: 0;
     }
     .brakeTestRoot .btTabs { display: flex; align-items: center; gap: 0.89cqw; }
@@ -50,7 +55,7 @@
 
     .brakeTestRoot .btWidgets {
       display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; column-gap: 0.72cqw;
-      order: 1; flex-shrink: 0;
+      flex: 1; min-height: 0;
     }
     .brakeTestRoot .btTile {
       padding: 1.32cqh 0.89cqw; border: 1px solid rgba(255,255,255,0.09);
@@ -99,20 +104,20 @@
     @media (prefers-reduced-motion: reduce) { .brakeTestRoot .btStatusSq.state-recording { animation: none; } }
     @keyframes btRecPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-    .brakeTestRoot .btFoot { order: 1; font-size: min(2.64cqh, 1.45cqw); color: #838e9a; margin-top: 0.53cqh; flex-shrink: 0; }
+    .brakeTestRoot .btFoot { font-size: min(2.64cqh, 1.45cqw); color: #838e9a; margin-top: 0.53cqh; flex-shrink: 0; }
 
     /* Secondary tabs (Config / Settings / Details / History) — same cqh-proportional
        height as Main's natural content, so every tab keeps the same footprint AND
        that footprint scales together with the container, matching Main. */
-    .brakeTestRoot .btPanel { order: 1; flex-shrink: 0; }
+    .brakeTestRoot .btPanel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .brakeTestRoot .btScroll {
-      height: 21.3cqh; overflow-y: auto; overflow-x: hidden; padding-right: 0.28cqw; scrollbar-gutter: stable;
+      flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding-right: 0.28cqw; scrollbar-gutter: stable;
       scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.28) transparent;
     }
     .brakeTestRoot .btScroll::-webkit-scrollbar { width: 5px; }
     .brakeTestRoot .btScroll::-webkit-scrollbar-track { background: transparent; }
     .brakeTestRoot .btScroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
-    .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; row-gap: 1.32cqh; column-gap: 0.72cqw; align-items: start; }
+    .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; row-gap: 1.32cqh; column-gap: 0.72cqw; flex: 1; }
     .brakeTestRoot .btTiles .span2 { grid-column: 1 / -1; }
 
     .brakeTestRoot .btField { display: flex; align-items: center; justify-content: space-between; gap: 0.89cqw; margin-top: 0.79cqh; font-size: min(2.9cqh, 1.61cqw); font-weight: 600; color: #dfe3e6; }
@@ -193,7 +198,9 @@
   </style>
 
   <!-- ================= MAIN: state + last result, always visible ================= -->
-  <div class="btWidgets" ng-show="activeTab === 'main'">
+  <div class="btBody">
+  <div class="btMainBody" ng-show="activeTab === 'main'">
+  <div class="btWidgets">
     <div class="btTile" ng-style="hudTileStyle()">
       <div class="btTileLabel">Stopping distance</div>
       <div class="btDistRow">
@@ -223,8 +230,9 @@
       <div class="btRow" ng-if="data.actual_start_mph">Actual <b>{{ data.actual_start_mph }}</b> mph</div>
     </div>
   </div>
-  <div class="btFoot" ng-show="activeTab === 'main'">
+  <div class="btFoot">
     Coast +{{ btInputCoastMph }} &middot; Steer {{ btEnableTurning ? 'on' : 'off' }} &middot; {{ btInputTelemetryHz || 0 }} Hz
+  </div>
   </div>
 
   <!-- ================= CONFIG: what THIS TEST is. Saved per slot. ================= -->
@@ -331,6 +339,8 @@
   </div>
 
   <!-- Nav rail: tabs (left) · Start/Stop (right) -->
+  </div>
+
   <div class="btNav" ng-style="hudNavStyle()">
     <div class="btTabs">
       <span ng-class="{active: activeTab === 'main'}" ng-click="setTab('main')">Main</span>
