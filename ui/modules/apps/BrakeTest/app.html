@@ -163,7 +163,8 @@
     .brakeTestRoot .btOpacityRow b { color: #fff; font-size: min(7.2cqh, 2.9cqw); }
 
     .brakeTestRoot .btFoot2 { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 0; font-size: min(7.2cqh, 2.9cqw); color: #dfe3e6; white-space: nowrap; }
-    .brakeTestRoot .btFoot2 > span { display: inline-flex; align-items: center; gap: 0.8cqw; flex-shrink: 0; }
+    .brakeTestRoot .btFoot2 > span { display: inline-flex; align-items: center; gap: 0.6cqw; min-width: 0; }
+    .brakeTestRoot .btFoot2 > span:first-child { flex-shrink: 1; overflow: hidden; }
     .brakeTestRoot .btSlots { display: inline-flex; gap: 0.62cqw; flex-shrink: 0; }
     .brakeTestRoot .btSlots b {
       width: 4.56cqw; height: 10.52cqh; display: flex; align-items: center; justify-content: center;
@@ -172,8 +173,8 @@
     }
     .brakeTestRoot .btSlots b.active { background: #ff6600; border-color: #ff6600; color: #000; }
     .brakeTestRoot .btBtn {
-      background: #ff6600; color: #000; border: 0; font-family: inherit; font-size: min(8.1cqh, 3.21cqw); font-weight: 900;
-      letter-spacing: 0.05em; text-transform: uppercase; padding: 1.8cqh 2.4cqw; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      background: #ff6600; color: #000; border: 0; font-family: inherit; font-size: min(6.5cqh, 2.4cqw); font-weight: 900;
+      letter-spacing: 0.04em; text-transform: uppercase; padding: 1.5cqh 1.8cqw; cursor: pointer; white-space: nowrap; flex-shrink: 0;
     }
     .brakeTestRoot .btBtn.ghost { background: rgba(255,255,255,0.08); color: #dfe3e6; border: 1px solid rgba(255,255,255,0.14); }
     .brakeTestRoot .btBtn:disabled { background: rgba(255,255,255,0.06); color: #59616a; cursor: not-allowed; }
