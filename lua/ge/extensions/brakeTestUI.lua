@@ -207,6 +207,20 @@ local function toggleAutoTestRun()
   end
 end
 
+-- exploreFolder accepts a FILE path and opens its folder with the file
+-- selected (core/replay.lua does the same with a replay). Resolving through
+-- FS:getFileRealPath is what turns our userpath-relative name into something
+-- the OS file browser understands; "/" is the userpath root as a fallback,
+-- which is where relative io.open() calls land and so where the CSV lives.
+local function openHistoryFolder()
+  local real = FS and FS.getFileRealPath and FS:getFileRealPath(HISTORY_FILE)
+  if real and real ~= "" then
+    Engine.Platform.exploreFolder(real)
+  else
+    Engine.Platform.exploreFolder("/")
+  end
+end
+
 M.onExtensionLoaded = onExtensionLoaded
 M.onVehicleSpawned  = onVehicleSpawned
 M.onVehicleSwitched = onVehicleSwitched
@@ -221,5 +235,6 @@ M.requestPresets = requestPresets
 M.setDetectorEnabled = setDetectorEnabled
 M.requestHistory = requestHistory
 M.trimHistory = trimHistory
+M.openHistoryFolder = openHistoryFolder
 
 return M

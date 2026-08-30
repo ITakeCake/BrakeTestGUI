@@ -36,6 +36,13 @@ angular.module('beamng.apps')
       $scope.btEnableTurning = false;
       $scope.btInputSteerAmt = 0.0;
       $scope.btInputSteerAtMph = 0.0;
+      // Which speed trips the steering input. Lua only ever receives an
+      // absolute mph; the mode decides which number that is. Binding it to
+      // Record or Brake keeps the trigger correct when those are later
+      // edited, which re-typing the same figure by hand does not.
+      // 'custom' is the default because it is what every existing preset
+      // means -- they predate this control and store a bare number.
+      $scope.btSteerAtMode = 'custom';
 
       // Settings (how the APP behaves — global, never in a slot)
       $scope.btAutoTest = false;
@@ -84,7 +91,10 @@ angular.module('beamng.apps')
         if (steerAmt < -1) steerAmt = -1;
         if (steerAmt > 1) steerAmt = 1;
 
-        var steerAtMph = parseFloat($scope.btInputSteerAtMph) || 0;
+        var steerAtMph;
+        if ($scope.btSteerAtMode === 'record')     steerAtMph = recordMph;
+        else if ($scope.btSteerAtMode === 'brake') steerAtMph = brakeMph;
+        else                                      steerAtMph = parseFloat($scope.btInputSteerAtMph) || 0;
         var steerAtMax = brakeMph + coastMph;
         if (steerAtMph < 0) steerAtMph = 0;
         if (steerAtMph > steerAtMax) steerAtMph = steerAtMax;
@@ -96,7 +106,7 @@ angular.module('beamng.apps')
         $scope.btInputRecordMph = recordMph;
         $scope.btInputCoastMph = coastMph;
         $scope.btInputSteerAmt = steerAmt;
-        $scope.btInputSteerAtMph = steerAtMph;
+        if ($scope.btSteerAtMode === 'custom') $scope.btInputSteerAtMph = steerAtMph;
         $scope.btInputTelemetryHz = telemetryHz;
 
         return {
@@ -119,6 +129,11 @@ angular.module('beamng.apps')
       };
 
       $scope.applyConfig = function () { $scope.pushAllParams(); };
+
+      $scope.setSteerAtMode = function (m) {
+        $scope.btSteerAtMode = m;
+        $scope.pushAllParams();
+      };
 
       $scope.toggleTurning = function () {
         bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setTurningEnabled(' + ($scope.btEnableTurning ? 'true' : 'false') + ')');
@@ -179,6 +194,7 @@ angular.module('beamng.apps')
         $scope.btInputCoastMph  = parseFloat(p.coast)  || 0;
         $scope.btInputSteerAmt  = parseFloat(p.steer)  || 0;
         $scope.btInputSteerAtMph = parseFloat(p.steerAt) || 0;
+        $scope.btSteerAtMode = p.steerAtMode || 'custom';
         $scope.btInputTelemetryHz = parseFloat(p.telemetryHz) || 0;
         $scope.btAutoTest      = (p.autoTest === true || p.autoTest === 'true');
         $scope.btEnableTurning = $scope.btAutoTest && (p.turnEnabled === true || p.turnEnabled === 'true');
@@ -193,6 +209,7 @@ angular.module('beamng.apps')
           coast: $scope.btInputCoastMph,
           steer: $scope.btInputSteerAmt,
           steerAt: $scope.btInputSteerAtMph,
+          steerAtMode: $scope.btSteerAtMode,
           turnEnabled: $scope.btEnableTurning,
           autoTest: $scope.btAutoTest,
           telemetryHz: $scope.btInputTelemetryHz
@@ -245,6 +262,10 @@ angular.module('beamng.apps')
           $scope.historyRows = rows;
         });
       });
+
+      $scope.openHistoryFolder = function () {
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.openHistoryFolder()');
+      };
 
       $scope.deleteOldestPast = function () {
         bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.trimHistory(' + (parseInt($scope.historyDeletePast, 10) || 200) + ')');

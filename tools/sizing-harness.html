@@ -19,6 +19,8 @@ var OPMODE = /[?&]op(=|&|$)/.test(location.search);  // must not match '?pop'
 var SIZES = OPMODE ? [[764,223],[764,223],[764,223],[764,223]]
                    : [[382,111.5],[764,223],[982,286.6],[1152,336.3]];
 var OPS = [0, 35, 72, 100];
+var TAB = (/[?&]tab=([a-z]+)/.exec(location.search) || [])[1];
+if (TAB) SIZES = [[764,223]];
 if (OPMODE) document.body.style.background =
   'repeating-linear-gradient(45deg,#c8d8e8 0 40px,#e8d8c0 40px 80px)';
 var stage=document.getElementById('stage');
@@ -41,18 +43,32 @@ document.querySelectorAll('.bng-app').forEach(function(box){
 });
 var POP = /[?&]pop(=|&|$)/.test(location.search);
 setTimeout(function(){
-  if(POP||OPMODE){
+  if(POP||OPMODE||TAB){
     document.querySelectorAll('.brakeTestRoot').forEach(function(r,i){
       var s=angular.element(r).scope();
       s.$apply(function(){
         if(OPMODE) s.hudOpacity=OPS[i];
+        if(TAB){
+          s.activeTab=TAB;
+          // 25 rows is the Show-last ceiling, so this is the worst case the
+          // frozen header has to survive.
+          s.historyRows=[];
+          for(var k=0;k<25;k++) s.historyRows.push({
+            car:'etk800', from:'60.0', dist:(37+k*0.11).toFixed(2),
+            g:(1.02-k*0.003).toFixed(3), time:'12:0'+(k%10), isBest:k===7});
+        }
         s.data.arc_dist_m='38.42'; s.data.avg_g='1.043'; s.data.avg_wheel_angle='12.4';
         s.data.understeer='3.1'; s.data.actual_start_mph='60.1';
         s.data.decel_path='M 0 18 L 20 6 L 50 4 L 80 7 L 100 16';
       });
     });
   }
-  setTimeout(measure,250);
+  // Scroll History so the frozen header is actually put under load -- an
+  // un-scrolled list proves nothing about position:sticky.
+  if(TAB==='history') setTimeout(function(){
+    document.querySelectorAll('.btScroll').forEach(function(sc){ sc.scrollTop=180; });
+  },200);
+  setTimeout(measure,400);
 },400);
 function outer(el){var c=getComputedStyle(el);return el.offsetHeight+parseFloat(c.marginTop)+parseFloat(c.marginBottom);}
 function measure(){

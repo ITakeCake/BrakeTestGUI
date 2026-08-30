@@ -203,6 +203,25 @@
     .brakeTestRoot .btSwitch::after { content: ""; position: absolute; top: 0.8cqh; left: 0.38cqw; width: 2.97cqw; height: 7.3cqh; background: #66717b; transition: left 0.15s, background 0.15s; }
     .brakeTestRoot .btSwitch.on { border-color: #ff6600; background: rgba(255,102,0,0.20); }
     .brakeTestRoot .btSwitch.on::after { left: 4.56cqw; background: #ff6600; }
+    /* Segmented picker. Shares the slot-chip look so it reads as part of the
+       same control family, and inherits --bt-a like everything else. */
+    /* A stacked field: label on its own line, controls full-width beneath.
+       Used where a control is too wide to sit beside its label in a
+       half-width tile. */
+    .brakeTestRoot .btField.stack { flex-direction: column; align-items: stretch; gap: 0.8cqh; }
+    .brakeTestRoot .btSegRow { display: flex; gap: 1.24cqw; align-items: stretch; }
+    .brakeTestRoot .btSegRow input[type="number"] { flex-shrink: 0; }
+    .brakeTestRoot .btSeg { display: flex; flex: 1; gap: 0.62cqw; }
+    .brakeTestRoot .btSeg b {
+      box-sizing: border-box; flex: 1; padding: 0.9cqh 1.24cqw; cursor: pointer; text-align: center;
+      font-size: min(5.9cqh, 2.4cqw); font-weight: 800; color: #fff; white-space: nowrap;
+      background: rgba(255,255,255, calc(var(--bt-a) * 0.139));
+      border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.083));
+    }
+    .brakeTestRoot .btSeg b.active {
+      background: rgba(255,102,0, calc(var(--bt-a) * 1.389));
+      border-color: rgba(255,102,0, calc(var(--bt-a) * 1.389));
+    }
     .brakeTestRoot .btOpacityRow { display: flex; align-items: center; gap: 1.24cqw; }
     .brakeTestRoot .btOpacityRow input[type="range"] { width: 19.36cqw; accent-color: #ff6600; }
     .brakeTestRoot .btOpacityRow b { color: #fff; font-size: min(7.2cqh, 2.9cqw); }
@@ -245,7 +264,13 @@
       /* Frozen top row. .btPanel.btScroll is the scroll container and this is
          a direct child of it, which is what makes top:0 stick. The opaque
          background is mandatory -- without it the rows scroll through it. */
-      position: sticky; top: 0; z-index: 3; background: rgba(18,22,28, calc(var(--bt-a) * 1.306));
+      /* The frozen header is the one surface that CANNOT be fully alpha-driven:
+         rows scroll underneath it, so below roughly 0.92 their text ghosts
+         through it. Even 0.92 ghosted visibly. This is the one deliberate
+         exception to the "0 leaves only words and letters" rule: a frozen
+         header that does not occlude is not a frozen header. */
+      position: sticky; top: 0; z-index: 3;
+      background: rgb(18,22,28);
       font-size: min(5.21cqh, 2.1cqw); font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 0.06em;
     }
     .brakeTestRoot .btHistHead span:not(:first-child) { text-align: right; }
@@ -262,6 +287,8 @@
       display: flex; justify-content: space-between; gap: 1.97cqw; margin-top: 3.25cqh; padding-top: 3.25cqh;
       border-top: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.097)); font-size: min(7.3cqh, 2.97cqw); font-weight: 700; color: #fff;
     }
+    .brakeTestRoot .btHistBtns { display: flex; gap: 1.31cqw; margin-top: 1.05cqw; }
+    .brakeTestRoot .btHistBtns .btBtn { flex: 1; }
     .brakeTestRoot .btHistFoot input[type="number"] {
       width: 12.96cqw; background: rgba(0,0,0, calc(var(--bt-a) * 0.625)); border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.222)); color: #fff;
       font-family: inherit; font-size: min(8.1cqh, 3.21cqw); text-align: right; padding: 0.8cqh 1cqw; outline: none; margin-left: 1cqw;
@@ -316,10 +343,20 @@
         <div class="btField"><span>Coast margin<small>lift above Brake at</small></span><input type="number" min="0" max="5" step="0.1" ng-model="btInputCoastMph"></div>
       </div>
       <div class="btTile">
-        <div class="btTileLabel">Scripted steering &middot; auto-driver only</div>
-        <div class="btField"><span>Enabled</span><button class="btSwitch" ng-class="{on: btEnableTurning}" ng-click="btEnableTurning = !btEnableTurning; toggleTurning()"></button></div>
+        <div class="btTileLabel">Scripted steering</div>
+        <div class="btField"><span>Enabled<small>auto-driver runs only</small></span><button class="btSwitch" ng-class="{on: btEnableTurning}" ng-click="btEnableTurning = !btEnableTurning; toggleTurning()"></button></div>
         <div class="btField" ng-class="{'is-off': !btEnableTurning}"><span>Steer amount<small>&minus;1 &hellip; +1</small></span><input type="number" min="-1" max="1" step="0.1" ng-model="btInputSteerAmt" ng-disabled="!btEnableTurning"></div>
-        <div class="btField" ng-class="{'is-off': !btEnableTurning}"><span>Steer at<small>mph &middot; 0 = never</small></span><input type="number" min="0" step="0.1" ng-model="btInputSteerAtMph" ng-disabled="!btEnableTurning"></div>
+        <div class="btField stack" ng-class="{'is-off': !btEnableTurning}">
+          <span>Steer at<small>which speed turns the wheel &middot; 0 = never</small></span>
+          <span class="btSegRow">
+            <span class="btSeg">
+              <b ng-class="{active: btSteerAtMode === 'record'}" ng-click="setSteerAtMode('record')">Record</b>
+              <b ng-class="{active: btSteerAtMode === 'brake'}" ng-click="setSteerAtMode('brake')">Brake</b>
+              <b ng-class="{active: btSteerAtMode === 'custom'}" ng-click="setSteerAtMode('custom')">Custom</b>
+            </span>
+            <input type="number" ng-if="btSteerAtMode === 'custom'" min="0" step="0.1" ng-model="btInputSteerAtMph" ng-disabled="!btEnableTurning">
+          </span>
+        </div>
       </div>
       <div class="btTile span2">
         <div class="btFoot2">
@@ -406,7 +443,10 @@
       <span>Show last <input type="number" min="1" max="25" ng-model="historyShowLast" ng-change="clampShowLast(); refreshHistory()"></span>
       <span>Delete oldest past <input type="number" min="1" ng-model="historyDeletePast"></span>
     </div>
-    <button class="btBtn ghost" style="width:100%;margin-top:4px" ng-click="deleteOldestPast()">Trim history</button>
+    <div class="btHistBtns">
+      <button class="btBtn ghost" ng-click="openHistoryFolder()">Open file location</button>
+      <button class="btBtn ghost" ng-click="deleteOldestPast()">Trim history</button>
+    </div>
   </div>
 
   <!-- Nav rail: tabs (left) · Start/Stop (right) -->
