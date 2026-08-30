@@ -1,16 +1,22 @@
 <div class="bngApp brakeTestRoot" ng-style="hudRootStyle()">
   <style>
-    /* Stock-BeamNG palette (Overpass, orange #ff6600) — see docs/GUI_TERMINOLOGY.md */
+    /* Stock-BeamNG palette (Overpass, orange #ff6600) — see docs/GUI_TERMINOLOGY.md.
+       container-type:size + min(Ncqh,Mcqw) font-sizing is the same technique the
+       original (pre-overhaul) app.html used — it's what makes the HUD scale to
+       whatever size the player drags the app window to, instead of staying a
+       fixed small block in a tall box. Every structural height/width below is
+       cqh/cqw for the same reason; only border-widths stay fixed px. */
     .brakeTestRoot {
       width: 100%; height: 100%;
       box-sizing: border-box;
       color: #f6f7f8;
       font-family: 'Overpass', 'Inter', sans-serif;
       border: 1px solid rgba(255,255,255,0.12);
-      padding: 6px 6px 3px;
+      padding: 1.58cqh 0.89cqw 0.79cqh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      container-type: size;
       user-select: none;
     }
 
@@ -18,23 +24,24 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin: 2px -6px -3px -6px;
-      padding: 2px 6px 2px;
+      margin: 0.53cqh -0.89cqw -0.79cqh -0.89cqw;
+      padding: 0.53cqh 0.89cqw;
       border-top: 1px solid rgba(255,255,255,0.07);
       order: 2;
+      flex-shrink: 0;
     }
-    .brakeTestRoot .btTabs { display: flex; align-items: center; gap: 6px; }
+    .brakeTestRoot .btTabs { display: flex; align-items: center; gap: 0.89cqw; }
     .brakeTestRoot .btTabs span {
-      cursor: pointer; padding: 1.5px 4px; line-height: 1.2;
-      font-size: 7px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-      color: rgba(255,255,255,0.45);
+      cursor: pointer; padding: 0.38cqh 0.56cqw; line-height: 1.2;
+      font-size: min(1.85cqh, 1cqw); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+      color: rgba(255,255,255,0.45); white-space: nowrap;
     }
     .brakeTestRoot .btTabs span:hover { color: #fff; }
     .brakeTestRoot .btTabs span.active { color: #fff; border-bottom: 2px solid #ff6600; }
 
     .brakeTestRoot .btRunBtn {
-      min-width: 40px; padding: 1.5px 6px; border: 1px solid #29cc5a; background: #29cc5a; color: #000;
-      font-family: inherit; font-size: 7px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;
+      min-width: 5.85cqw; padding: 0.38cqh 0.89cqw; border: 1px solid #29cc5a; background: #29cc5a; color: #000;
+      font-family: inherit; font-size: min(1.85cqh, 1cqw); font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;
       cursor: pointer;
     }
     .brakeTestRoot .btRunBtn:hover { background: #3ee06d; }
@@ -42,47 +49,47 @@
     .brakeTestRoot .btRunBtn.is-stop:hover { background: rgba(255,68,68,0.34); }
 
     .brakeTestRoot .btWidgets {
-      display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; gap: 5px;
-      order: 1;
+      display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; column-gap: 0.72cqw;
+      order: 1; flex-shrink: 0;
     }
     .brakeTestRoot .btTile {
-      padding: 5px 6px; border: 1px solid rgba(255,255,255,0.09);
-      position: relative;
+      padding: 1.32cqh 0.89cqw; border: 1px solid rgba(255,255,255,0.09);
+      position: relative; overflow: hidden;
     }
     .brakeTestRoot .btTile.span2 { grid-column: 1 / -1; }
     .brakeTestRoot .btTileLabel {
-      color: #838e9a; font-size: 7px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
+      color: #838e9a; font-size: min(1.85cqh, 1cqw); font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
     }
 
-    .brakeTestRoot .btDistRow { display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; margin-top: 2px; }
-    .brakeTestRoot .btBig { color: #fff; font-size: 29px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
-    .brakeTestRoot .btBig small { margin-left: 3px; color: #ff8955; font-size: 11px; font-weight: 700; }
+    .brakeTestRoot .btDistRow { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.56cqw; margin-top: 0.53cqh; }
+    .brakeTestRoot .btBig { color: #fff; font-size: min(7.63cqh, 4.23cqw); font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+    .brakeTestRoot .btBig small { margin-left: 0.45cqw; color: #ff8955; font-size: min(2.9cqh, 1.61cqw); font-weight: 700; }
     .brakeTestRoot .btMini { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; flex-shrink: 0; }
-    .brakeTestRoot .btMini .lbl { font-size: 6px; font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em; }
-    .brakeTestRoot .btMini .val { margin-top: 1px; font-size: 13px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
-    .brakeTestRoot .btMini .val small { font-size: 8px; font-weight: 700; color: #ff8955; margin-left: 1px; }
+    .brakeTestRoot .btMini .lbl { font-size: min(1.58cqh, 0.89cqw); font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em; }
+    .brakeTestRoot .btMini .val { margin-top: 0.26cqh; font-size: min(3.43cqh, 1.89cqw); font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+    .brakeTestRoot .btMini .val small { font-size: min(2.11cqh, 1.17cqw); font-weight: 700; color: #ff8955; margin-left: 0.17cqw; }
 
-    .brakeTestRoot .btPresets { display: flex; align-items: center; gap: 3px; margin-top: 4px; }
+    .brakeTestRoot .btPresets { display: flex; align-items: center; gap: 0.45cqw; margin-top: 1.06cqh; }
     .brakeTestRoot .btPresets b {
-      flex: 1; padding: 2px 0; text-align: center; font-size: 10px; font-weight: 900; color: #fff;
+      flex: 1; padding: 0.53cqh 0; text-align: center; font-size: min(2.64cqh, 1.45cqw); font-weight: 900; color: #fff;
       background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.2); cursor: pointer;
     }
     .brakeTestRoot .btPresets b.active { background: #ff6600; border-color: #ff6600; color: #000; }
 
-    .brakeTestRoot .btGWrap { position: relative; height: 30px; margin: 2px -6px 0 -6px; padding: 0 6px; overflow: hidden; }
+    .brakeTestRoot .btGWrap { position: relative; height: 7.89cqh; margin: 0.53cqh -0.89cqw 0 -0.89cqw; padding: 0 0.89cqw; overflow: hidden; }
     .brakeTestRoot .btGCurve { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; pointer-events: none; }
     .brakeTestRoot .btGCurve path { fill: none; stroke: #ff6600; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-    .brakeTestRoot .btG { position: relative; z-index: 1; color: #fff; font-size: 29px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
-    .brakeTestRoot .btG small { color: #ff8955; font-size: 11px; font-weight: 700; }
+    .brakeTestRoot .btG { position: relative; z-index: 1; color: #fff; font-size: min(7.63cqh, 4.23cqw); font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+    .brakeTestRoot .btG small { color: #ff8955; font-size: min(2.9cqh, 1.61cqw); font-weight: 700; }
 
-    .brakeTestRoot .btRow { margin-top: 3px; font-size: 10px; font-weight: 700; color: #dfe3e6; }
-    .brakeTestRoot .btRow + .btRow { margin-top: 2px; }
+    .brakeTestRoot .btRow { margin-top: 0.79cqh; font-size: min(2.64cqh, 1.45cqw); font-weight: 700; color: #dfe3e6; }
+    .brakeTestRoot .btRow + .btRow { margin-top: 0.53cqh; }
     .brakeTestRoot .btRow b, .brakeTestRoot .btRow .val { color: #fff; font-variant-numeric: tabular-nums; }
-    .brakeTestRoot .btRow .val small { font-weight: 600; color: #838e9a; font-size: 9px; margin-left: 3px; }
-    .brakeTestRoot .btRow .val.hero { font-size: 15px; color: #ff8955; }
+    .brakeTestRoot .btRow .val small { font-weight: 600; color: #838e9a; font-size: min(2.38cqh, 1.34cqw); margin-left: 0.45cqw; }
+    .brakeTestRoot .btRow .val.hero { font-size: min(3.96cqh, 2.17cqw); color: #ff8955; }
 
     .brakeTestRoot .btStatusSq {
-      position: absolute; top: 4px; right: 4px; width: 15px; height: 6px; padding: 0;
+      position: absolute; top: 1.06cqh; right: 0.56cqw; width: 2.17cqw; height: 1.58cqh; padding: 0;
       border: 1px solid rgba(0,0,0,0.4); cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
     }
     .brakeTestRoot .btStatusSq.state-off { background: #565d66; }
@@ -92,91 +99,93 @@
     @media (prefers-reduced-motion: reduce) { .brakeTestRoot .btStatusSq.state-recording { animation: none; } }
     @keyframes btRecPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-    .brakeTestRoot .btFoot { order: 1; font-size: 10px; color: #838e9a; margin-top: 2px; }
+    .brakeTestRoot .btFoot { order: 1; font-size: min(2.64cqh, 1.45cqw); color: #838e9a; margin-top: 0.53cqh; flex-shrink: 0; }
 
-    /* Secondary tabs (Config / Settings / Details / History) */
-    .brakeTestRoot .btPanel { order: 1; }
+    /* Secondary tabs (Config / Settings / Details / History) — same cqh-proportional
+       height as Main's natural content, so every tab keeps the same footprint AND
+       that footprint scales together with the container, matching Main. */
+    .brakeTestRoot .btPanel { order: 1; flex-shrink: 0; }
     .brakeTestRoot .btScroll {
-      height: 81px; overflow-y: auto; overflow-x: hidden; padding-right: 2px; scrollbar-gutter: stable;
+      height: 21.3cqh; overflow-y: auto; overflow-x: hidden; padding-right: 0.28cqw; scrollbar-gutter: stable;
       scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.28) transparent;
     }
     .brakeTestRoot .btScroll::-webkit-scrollbar { width: 5px; }
     .brakeTestRoot .btScroll::-webkit-scrollbar-track { background: transparent; }
     .brakeTestRoot .btScroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
-    .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; align-items: start; }
+    .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; row-gap: 1.32cqh; column-gap: 0.72cqw; align-items: start; }
     .brakeTestRoot .btTiles .span2 { grid-column: 1 / -1; }
 
-    .brakeTestRoot .btField { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 3px; font-size: 11px; font-weight: 600; color: #dfe3e6; }
-    .brakeTestRoot .btField:first-of-type { margin-top: 2px; }
-    .brakeTestRoot .btField small { display: block; font-size: 9px; font-weight: 700; color: #838e9a; }
+    .brakeTestRoot .btField { display: flex; align-items: center; justify-content: space-between; gap: 0.89cqw; margin-top: 0.79cqh; font-size: min(2.9cqh, 1.61cqw); font-weight: 600; color: #dfe3e6; }
+    .brakeTestRoot .btField:first-of-type { margin-top: 0.53cqh; }
+    .brakeTestRoot .btField small { display: block; font-size: min(2.38cqh, 1.34cqw); font-weight: 700; color: #838e9a; }
     .brakeTestRoot .btField.is-off { opacity: 0.4; }
     .brakeTestRoot .btField input[type="number"] {
-      width: 46px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: #fff;
-      font-family: inherit; font-size: 11px; font-weight: 800; text-align: right; padding: 2px 4px; outline: none;
+      width: 6.68cqw; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: #fff;
+      font-family: inherit; font-size: min(2.9cqh, 1.61cqw); font-weight: 800; text-align: right; padding: 0.53cqh 0.56cqw; outline: none;
     }
     .brakeTestRoot .btField input[type="number"]:focus { border-color: #ff6600; }
     .brakeTestRoot .btSwitch {
-      width: 26px; height: 13px; border: 1px solid rgba(255,255,255,0.16); background: rgba(0,0,0,0.45);
+      width: 3.79cqw; height: 3.43cqh; border: 1px solid rgba(255,255,255,0.16); background: rgba(0,0,0,0.45);
       position: relative; cursor: pointer; flex-shrink: 0; padding: 0;
     }
-    .brakeTestRoot .btSwitch::after { content: ""; position: absolute; top: 1px; left: 1px; width: 9px; height: 9px; background: #66717b; transition: left 0.15s, background 0.15s; }
+    .brakeTestRoot .btSwitch::after { content: ""; position: absolute; top: 0.26cqh; left: 0.17cqw; width: 1.34cqw; height: 2.38cqh; background: #66717b; transition: left 0.15s, background 0.15s; }
     .brakeTestRoot .btSwitch.on { border-color: #ff6600; background: rgba(255,102,0,0.20); }
-    .brakeTestRoot .btSwitch.on::after { left: 14px; background: #ff6600; }
-    .brakeTestRoot .btOpacityRow { display: flex; align-items: center; gap: 4px; }
-    .brakeTestRoot .btOpacityRow input[type="range"] { width: 60px; accent-color: #ff6600; }
-    .brakeTestRoot .btOpacityRow b { color: #fff; font-size: 11px; }
+    .brakeTestRoot .btSwitch.on::after { left: 2.06cqw; background: #ff6600; }
+    .brakeTestRoot .btOpacityRow { display: flex; align-items: center; gap: 0.56cqw; }
+    .brakeTestRoot .btOpacityRow input[type="range"] { width: 8.74cqw; accent-color: #ff6600; }
+    .brakeTestRoot .btOpacityRow b { color: #fff; font-size: min(2.9cqh, 1.61cqw); }
 
-    .brakeTestRoot .btFoot2 { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 2px; font-size: 11px; color: #dfe3e6; }
-    .brakeTestRoot .btSlots { display: inline-flex; gap: 2px; }
+    .brakeTestRoot .btFoot2 { display: flex; align-items: center; justify-content: space-between; gap: 0.89cqw; margin-top: 0.53cqh; font-size: min(2.9cqh, 1.61cqw); color: #dfe3e6; }
+    .brakeTestRoot .btSlots { display: inline-flex; gap: 0.28cqw; }
     .brakeTestRoot .btSlots b {
-      width: 14px; height: 13px; display: flex; align-items: center; justify-content: center;
-      font-size: 8px; font-weight: 800; color: #c9d0d7; background: rgba(255,255,255,0.10);
+      width: 2.06cqw; height: 3.43cqh; display: flex; align-items: center; justify-content: center;
+      font-size: min(2.11cqh, 1.17cqw); font-weight: 800; color: #c9d0d7; background: rgba(255,255,255,0.10);
       border: 1px solid rgba(255,255,255,0.06); cursor: pointer;
     }
     .brakeTestRoot .btSlots b.active { background: #ff6600; border-color: #ff6600; color: #000; }
     .brakeTestRoot .btBtn {
-      background: #ff6600; color: #000; border: 0; font-family: inherit; font-size: 10px; font-weight: 900;
-      letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 9px; cursor: pointer;
+      background: #ff6600; color: #000; border: 0; font-family: inherit; font-size: min(2.64cqh, 1.45cqw); font-weight: 900;
+      letter-spacing: 0.05em; text-transform: uppercase; padding: 0.79cqh 1.34cqw; cursor: pointer;
     }
     .brakeTestRoot .btBtn.ghost { background: rgba(255,255,255,0.08); color: #dfe3e6; border: 1px solid rgba(255,255,255,0.14); }
     .brakeTestRoot .btBtn:disabled { background: rgba(255,255,255,0.06); color: #59616a; cursor: not-allowed; }
 
     .brakeTestRoot .btTorqueHead {
-      display: grid; grid-template-columns: 22px 1fr 1fr 1fr; gap: 1px 6px; margin-top: 3px;
-      font-size: 7px; font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em;
+      display: grid; grid-template-columns: 22px 1fr 1fr 1fr; row-gap: 0.26cqh; column-gap: 0.89cqw; margin-top: 0.79cqh;
+      font-size: min(1.85cqh, 1cqw); font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em;
     }
     .brakeTestRoot .btTorqueHead span:not(:first-child) { text-align: right; }
     .brakeTestRoot .btTorqueRow {
-      position: relative; display: grid; grid-template-columns: 22px 1fr 1fr 1fr; gap: 1px 6px; align-items: center;
-      height: 13px; margin-top: 1px; font-size: 9px; font-weight: 700; color: #dfe3e6; font-variant-numeric: tabular-nums;
+      position: relative; display: grid; grid-template-columns: 22px 1fr 1fr 1fr; row-gap: 0.26cqh; column-gap: 0.89cqw; align-items: center;
+      height: 3.43cqh; margin-top: 0.26cqh; font-size: min(2.38cqh, 1.34cqw); font-weight: 700; color: #dfe3e6; font-variant-numeric: tabular-nums;
     }
     .brakeTestRoot .btTorqueRow .wheelSpark { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; pointer-events: none; }
     .brakeTestRoot .btTorqueRow .wheelSpark path { fill: none; stroke: #ff6600; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .brakeTestRoot .btTorqueRow .w, .brakeTestRoot .btTorqueRow .n { position: relative; z-index: 1; }
-    .brakeTestRoot .btTorqueRow .w { color: #838e9a; font-size: 8px; font-weight: 800; }
+    .brakeTestRoot .btTorqueRow .w { color: #838e9a; font-size: min(2.11cqh, 1.17cqw); font-weight: 800; }
     .brakeTestRoot .btTorqueRow .n { text-align: right; color: #fff; text-shadow: 0 0 3px rgba(9,12,16,0.9), 0 0 3px rgba(9,12,16,0.9); }
 
     .brakeTestRoot .btHistHead {
-      display: grid; grid-template-columns: 1fr 0.6fr 0.9fr 0.6fr 0.7fr; gap: 4px; padding: 0 2px 2px;
-      font-size: 6.5px; font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em;
+      display: grid; grid-template-columns: 1fr 0.6fr 0.9fr 0.6fr 0.7fr; row-gap: 1.06cqh; column-gap: 0.56cqw; padding: 0 0.28cqw 0.53cqh;
+      font-size: min(1.7cqh, 0.95cqw); font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em;
     }
     .brakeTestRoot .btHistHead span:not(:first-child) { text-align: right; }
     .brakeTestRoot .btHistRow {
-      display: grid; grid-template-columns: 1fr 0.6fr 0.9fr 0.6fr 0.7fr; gap: 4px; align-items: center;
-      padding: 3px 2px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 9px; font-weight: 700;
+      display: grid; grid-template-columns: 1fr 0.6fr 0.9fr 0.6fr 0.7fr; row-gap: 1.06cqh; column-gap: 0.56cqw; align-items: center;
+      padding: 0.79cqh 0.28cqw; border-top: 1px solid rgba(255,255,255,0.07); font-size: min(2.38cqh, 1.34cqw); font-weight: 700;
       color: #dfe3e6; font-variant-numeric: tabular-nums;
     }
     .brakeTestRoot .btHistRow .hn { text-align: right; }
     .brakeTestRoot .btHistRow.best { color: #fff; }
     .brakeTestRoot .btHistRow.best .hn:nth-child(3) { color: #ff8955; font-weight: 800; }
-    .brakeTestRoot .btHistEmpty { padding: 8px 2px; font-size: 10px; color: #838e9a; text-align: center; }
+    .brakeTestRoot .btHistEmpty { padding: 2.11cqh 0.28cqw; font-size: min(2.64cqh, 1.45cqw); color: #838e9a; text-align: center; }
     .brakeTestRoot .btHistFoot {
-      display: flex; justify-content: space-between; gap: 6px; margin-top: 4px; padding-top: 4px;
-      border-top: 1px solid rgba(255,255,255,0.07); font-size: 9px; font-weight: 700; color: #838e9a;
+      display: flex; justify-content: space-between; gap: 0.89cqw; margin-top: 1.06cqh; padding-top: 1.06cqh;
+      border-top: 1px solid rgba(255,255,255,0.07); font-size: min(2.38cqh, 1.34cqw); font-weight: 700; color: #838e9a;
     }
     .brakeTestRoot .btHistFoot input[type="number"] {
-      width: 40px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: #fff;
-      font-family: inherit; font-size: 10px; text-align: right; padding: 1px 3px; outline: none; margin-left: 3px;
+      width: 5.85cqw; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: #fff;
+      font-family: inherit; font-size: min(2.64cqh, 1.45cqw); text-align: right; padding: 0.26cqh 0.45cqw; outline: none; margin-left: 0.45cqw;
     }
 
     button { font: inherit; }
