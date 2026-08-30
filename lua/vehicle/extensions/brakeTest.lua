@@ -297,24 +297,31 @@ local forceUiUpdate = false
 
 local lastSentInputs = { th = -1, br = -1, cl = -1, st = -999 }
 
+-- input.event's third argument is the input FILTER, not a device or player
+-- index: 0 FILTER_KBD, 1 FILTER_PAD, 2 FILTER_DIRECT, 3 FILTER_KBD2. event()
+-- only stores it, so a second call with a different filter overwrites the
+-- first rather than adding to it. Every channel here used to be sent twice,
+-- with 1 then 2; the 1 was dead code -- 2 always won. Only the 2 remains.
+--
+-- FILTER_DIRECT is the deliberate choice: for non-steering inputs it is the
+-- one filter that applies no temporal smoothing, so the pedal value the state
+-- machine asks for is the value the vehicle receives. Changing it would
+-- change measured results (keyboard's FILTER_KBD ramps brake at 3 units/sec,
+-- roughly 333 ms to full). See docs/BRAKE_INPUT.md.
 local function applyInputs(th, br, cl, st)
   if th ~= lastSentInputs.th then
-    input.event("throttle", th, 1)
     input.event("throttle", th, 2)
     lastSentInputs.th = th
   end
   if br ~= lastSentInputs.br then
-    input.event("brake", br, 1)
     input.event("brake", br, 2)
     lastSentInputs.br = br
   end
   if cl ~= lastSentInputs.cl then
-    input.event("clutch", cl, 1)
     input.event("clutch", cl, 2)
     lastSentInputs.cl = cl
   end
   if st ~= lastSentInputs.st then
-    input.event("steering", st, 1)
     input.event("steering", st, 2)
     lastSentInputs.st = st
   end
