@@ -20,7 +20,21 @@ var SIZES = OPMODE ? [[764,223],[764,223],[764,223],[764,223]]
                    : [[382,111.5],[764,223],[982,286.6],[1152,336.3]];
 var OPS = [0, 35, 72, 100];
 var TAB = (/[?&]tab=([a-z]+)/.exec(location.search) || [])[1];
-if (TAB) SIZES = [[764,223]];
+// ?shot= is the README-screenshot mode: one app, 1000x292 (the locked
+// 3.4260:1 aspect), neutral backdrop so the translucency is visible, and no
+// harness chrome in frame. Pair it with --force-device-scale-factor=2.
+var SHOT = (/[?&]shot=([a-z]+)/.exec(location.search) || [])[1];
+if (SHOT) { TAB = SHOT; SIZES = [[1000,292]]; }
+else if (TAB) SIZES = [[764,223]];
+if (SHOT) {
+  var st=document.createElement('style');
+  // Must beat the harness's own body{background:#111} -- the HUD is
+  // translucent, so a screenshot on flat black would misrepresent it.
+  st.textContent='body{margin:0;padding:18px;'
+    +'background:linear-gradient(160deg,#33404e 0%,#4a5a68 40%,#6b7885 70%,#8a9099 100%)}'
+    +'#out{display:none}.bng-app{margin:0}';
+  document.head.appendChild(st);
+}
 if (OPMODE) document.body.style.background =
   'repeating-linear-gradient(45deg,#c8d8e8 0 40px,#e8d8c0 40px 80px)';
 var stage=document.getElementById('stage');
@@ -43,13 +57,27 @@ document.querySelectorAll('.bng-app').forEach(function(box){
 });
 var POP = /[?&]pop(=|&|$)/.test(location.search);
 setTimeout(function(){
-  if(POP||OPMODE||TAB){
+  if(POP||OPMODE||TAB||SHOT){
     document.querySelectorAll('.brakeTestRoot').forEach(function(r,i){
       var s=angular.element(r).scope();
       s.$apply(function(){
         if(OPMODE) s.hudOpacity=OPS[i];
         if(TAB){
           s.activeTab=TAB;
+          s.data.turning_enabled=true;
+          s.data.avg_steer_input='0.42'; s.data.achieved_yaw='18.7'; s.data.acs_score='87.4';
+          s.data.dist_m='37.91'; s.data.arc_dist_ft='127.6'; s.data.duration_s='2.71';
+          s.data.car='etk 800-Series'; s.data.time_str='14:22:07';
+          s.data.bf_avg={FL:'1842',FR:'1839',RL:'1104',RR:'1101'};
+          s.data.bf_max={FL:'2410',FR:'2402',RL:'1466',RR:'1460'};
+          s.data.bf_min={FL:'0',FR:'0',RL:'0',RR:'0'};
+          s.data.torque_fl_path='M 0 19 L 12 4 L 40 3 L 70 5 L 100 17';
+          s.data.torque_fr_path='M 0 19 L 12 5 L 40 3 L 70 6 L 100 17';
+          s.data.torque_rl_path='M 0 19 L 14 8 L 42 7 L 72 9 L 100 18';
+          s.data.torque_rr_path='M 0 19 L 14 8 L 42 7 L 72 9 L 100 18';
+          s.btInputBrakeMph=60; s.btInputRecordMph=60; s.btInputCoastMph=2;
+          s.btEnableTurning=true; s.btInputSteerAmt=0.4; s.btSteerAtMode='record';
+          s.btAutoTest=true; s.btInputTelemetryHz=200;
           // 25 rows is the Show-last ceiling, so this is the worst case the
           // frozen header has to survive.
           s.historyRows=[];
@@ -65,8 +93,13 @@ setTimeout(function(){
   }
   // Scroll History so the frozen header is actually put under load -- an
   // un-scrolled list proves nothing about position:sticky.
-  if(TAB==='history') setTimeout(function(){
-    document.querySelectorAll('.btScroll').forEach(function(sc){ sc.scrollTop=180; });
+  // &sc=<px> scrolls the secondary tabs, so a screenshot can show content
+  // that lives below the fold (Details' brake-torque grid, History's rows
+  // under the frozen header).
+  var SC = parseInt((/[?&]sc=(\d+)/.exec(location.search)||[])[1], 10);
+  if(TAB==='history' && isNaN(SC)) SC=180;
+  if(!isNaN(SC)) setTimeout(function(){
+    document.querySelectorAll('.btScroll').forEach(function(sc){ sc.scrollTop=SC; });
   },200);
   setTimeout(measure,400);
 },400);
