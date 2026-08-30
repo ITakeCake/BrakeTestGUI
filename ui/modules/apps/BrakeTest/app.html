@@ -12,7 +12,7 @@
       color: #f6f7f8;
       font-family: 'Overpass', 'Inter', sans-serif;
       border: 1px solid rgba(255,255,255,0.12);
-      padding: 2.4cqh 1.4cqw 1.6cqh;
+      padding: 5.4cqh 1.57cqw 0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -28,10 +28,10 @@
 
     .brakeTestRoot .btNav {
       display: flex;
-      justify-content: space-between;
+      gap: 1.57cqw;
       align-items: center;
-      margin: 1.63cqh -1.97cqw -2.42cqh -1.97cqw;
-      padding: 1.63cqh 1.97cqw;
+      margin: 1.8cqh -1.57cqw 0 -1.57cqw;
+      padding: 1.8cqh 1.57cqw;
       border-top: 1px solid rgba(255,255,255,0.07);
       flex-shrink: 0;
     }
@@ -54,14 +54,14 @@
     .brakeTestRoot .btRunBtn.is-stop:hover { background: rgba(255,68,68,0.34); }
 
     .brakeTestRoot .btWidgets {
-      display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; column-gap: 1.2cqw;
-      flex: 0 1 auto; min-height: 0; max-height: 66cqh;
+      display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; column-gap: 1.31cqw;
+      flex: 1; min-height: 0;
     }
     /* Same as ABSGripGauges' .absGripCell: flex-column + centered, so when the
        tile is taller than its text the content floats in the middle instead of
        clumping at the top with a dead zone underneath. */
     .brakeTestRoot .btTile {
-      padding: 2cqh 1.4cqw; border: 1px solid rgba(255,255,255,0.09);
+      padding: 4.5cqh 1.57cqw; border: 1px solid rgba(255,255,255,0.09);
       position: relative; overflow: hidden;
       display: flex; flex-direction: column; justify-content: center;
     }
@@ -115,7 +115,9 @@
     @media (prefers-reduced-motion: reduce) { .brakeTestRoot .btStatusSq.state-recording { animation: none; } }
     @keyframes btRecPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-    .brakeTestRoot .btFoot { font-size: min(8.1cqh, 3.21cqw); color: #838e9a; margin-top: 1cqh; flex-shrink: 0; }
+    .brakeTestRoot .btNavCfg { margin-left: auto; font-size: min(6.3cqh, 2.2cqw); color: rgba(255,255,255,0.45); white-space: nowrap; letter-spacing: 0.02em; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+    .brakeTestRoot .btTabs { flex-shrink: 0; }
+    .brakeTestRoot .btRunBtn { flex-shrink: 0; }
 
     /* Secondary tabs (Config / Settings / Details / History) — same cqh-proportional
        height as Main's natural content, so every tab keeps the same footprint AND
@@ -140,7 +142,7 @@
        field tiles and the whole thing overshoots into a needless scrollbar. */
     .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(max-content, 1fr); row-gap: 2.6cqh; column-gap: 1.59cqw; flex: 1; min-height: 0; }
     .brakeTestRoot .btTiles .span2 { grid-column: 1 / -1; }
-    .brakeTestRoot .btTiles .btTile { padding: 1.8cqh 1.4cqw; }
+    .brakeTestRoot .btTiles .btTile { padding: 3cqh 1.57cqw; }
 
     .brakeTestRoot .btField { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 1.2cqh; font-size: min(6.8cqh, 2.75cqw); font-weight: 600; color: #dfe3e6; white-space: nowrap; }
     .brakeTestRoot .btField:first-of-type { margin-top: 0.8cqh; }
@@ -253,9 +255,6 @@
       <div class="btRow">Record <b>{{ btInputRecordMph || '--' }}</b> mph</div>
       <div class="btRow" ng-if="data.actual_start_mph">Actual <b>{{ data.actual_start_mph }}</b> mph</div>
     </div>
-  </div>
-  <div class="btFoot">
-    Coast +{{ btInputCoastMph }} &middot; Steer {{ btEnableTurning ? 'on' : 'off' }} &middot; {{ btInputTelemetryHz || 0 }} Hz
   </div>
   </div>
 
@@ -373,6 +372,7 @@
       <span ng-class="{active: activeTab === 'details'}" ng-click="setTab('details')">Details</span>
       <span ng-class="{active: activeTab === 'history'}" ng-click="setTab('history')">History</span>
     </div>
+    <span class="btNavCfg" ng-show="activeTab === 'main'">Coast +{{ btInputCoastMph }} &middot; Steer {{ btEnableTurning ? 'on' : 'off' }} &middot; {{ btInputTelemetryHz || 0 }} Hz</span>
     <button class="btRunBtn" ng-class="{'is-stop': isRunning()}" ng-click="toggleRun()">{{ isRunning() ? 'Stop' : 'Start' }}</button>
   </div>
 </div>
