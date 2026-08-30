@@ -26,8 +26,9 @@ Two things about this bite:
   the root).
 - **The app window's size is whatever the player dragged it to.** It's stored
   per-layout in the game's `uilayout.json`, *not* in `app.json` — `app.json`'s
-  `css.width/height` is only the default for a fresh placement. So the app
-  has to look right at *any* aspect ratio, which is the whole reason for §2.
+  `css.width/height` is only the default for a fresh placement. The app must
+  therefore survive any *size*; its *aspect* is pinned separately by the
+  resize lock (§3b), and its type scales via container queries (§2).
 
 ## 2. Container-query units, and why the mockup's px numbers are the source of truth
 
@@ -73,6 +74,47 @@ sits on the bottom edge.
 If the nav ever floats off the bottom or in from the sides again, the first
 suspect is padding being re-added to `.brakeTestRoot` (including `.bngApp`'s
 2px — see §1) or a cq unit sneaking onto the root (§2).
+
+## 3b. The window is aspect-locked (preserveAspectRatio)
+
+This layout is a **wide strip**, not a panel: three tiles of 2-4 lines each
+can't consume height. Measured tile dead space vs. window aspect:
+
+| aspect | dead space in each tile |
+|---|---|
+| 3.43:1 (design) | ~25% |
+| 3.0:1 | ~29% |
+| 1.88:1 | ~55% |
+| 1.40:1 | ~64% |
+
+So the app is locked to its design ratio rather than re-tuned for each shape.
+BeamNG supports this natively: `ui/modules/apps/app.js` honours a **top-level**
+`"preserveAspectRatio": true` in app.json (a sibling of `css`, NOT inside it).
+21 stock apps use it (SimpleTacho, PowerTrainDebug, Compass, SimpleDash...).
+Our default is `764 x 223` - exactly 2x the 382 x 111.5 mockup, 3.4260:1.
+
+Three things about how the lock actually behaves (all from `app.js`):
+
+- **The locked ratio is NOT read from app.json.** It is captured at app load
+  from the live element: `initAspectRatio = offsetWidth / offsetHeight`
+  (`app.js:53`). A window already saved in the game's layout at some other
+  ratio will therefore lock to *that*. Changing the app.json default only
+  helps a fresh placement - an existing one must be removed and re-added, or
+  resized first.
+- **No `min-width` / `min-height`, on purpose.** Those are applied as real
+  CSS, so a floor on either axis would stop the element reaching the size the
+  lock computes and would silently break the ratio at small sizes. The resize
+  handler has its own hard floors (50 wide, 40 tall) applied *before* the
+  aspect correction, so the practical minimum lands around 50 x 15 at our
+  ratio.
+- **Resize snaps to 10px increments**, so exact odd numbers can't be reached
+  by dragging - 382 x 111.5 rounds to about 380 x 110.
+
+Consequence worth remembering: Details (and often History) will always scroll,
+because the window can never be made tall. That is the accepted trade for Main
+never having 55% dead space again. If a tall window is ever wanted, the fix is
+to make Main reflow - stack the three tiles vertically below about 2:1 - not
+to unlock the ratio.
 
 ## 4. Tiles fill the window; secondary tabs scroll
 

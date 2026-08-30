@@ -8,10 +8,11 @@
   "category": "Telemetry",
   "types": ["ui.apps.categories.vehicle_profiling"],
   "isAuxiliary": false,
+  "preserveAspectRatio": true,
   "css": {
     "left": "0px",
     "top": "0px",
-    "width": "320px",
-    "height": "210px"
+    "width": "764px",
+    "height": "223px"
   }
 }
