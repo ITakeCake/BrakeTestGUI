@@ -29,7 +29,7 @@ angular.module('beamng.apps')
 
       $scope.activeTab = 'main';
 
-      // Config (what THIS TEST is — saved per slot)
+      // Config (what THIS TEST is, saved per slot)
       $scope.btInputBrakeMph = null;
       $scope.btInputRecordMph = null;
       $scope.btInputCoastMph = 2.0;
@@ -44,11 +44,11 @@ angular.module('beamng.apps')
       // means -- they predate this control and store a bare number.
       $scope.btSteerAtMode = 'custom';
 
-      // Settings (how the APP behaves — global, never in a slot)
+      // Settings (how the APP behaves, global, never in a slot)
       $scope.btAutoTest = false;
       $scope.btInputTelemetryHz = 0;
 
-      // HUD opacity is a pure display preference — persisted per-browser-profile
+      // HUD opacity is a pure display preference: persisted per-browser-profile
       // like the presets' localStorage layer, no Lua involved.
       $scope.hudOpacity = parseInt(window.localStorage.getItem('brakeTestHudOpacity'), 10);
       if (isNaN($scope.hudOpacity)) $scope.hudOpacity = 72;
@@ -69,7 +69,7 @@ angular.module('beamng.apps')
       };
 
       // ------------------------------------------------------------------
-      // Config / Settings push — the ONE place that talks to Lua about
+      // Config / Settings push: the ONE place that talks to Lua about
       // parameters, so Apply / Start-run / preset-load / vehicle-switch can
       // never disagree with each other.
       // ------------------------------------------------------------------
@@ -160,7 +160,7 @@ angular.module('beamng.apps')
       };
 
       // Status square: reports the passive detector's state, never toggled by
-      // a click into a fake state — clicking it calls the real Lua setter and
+      // a click into a fake state: clicking it calls the real Lua setter and
       // waits for the next payload to confirm.
       $scope.toggleDetector = function () {
         bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setDetectorEnabled(' + (!$scope.data.detector_enabled ? 'true' : 'false') + ')');
@@ -174,7 +174,7 @@ angular.module('beamng.apps')
       };
 
       // ------------------------------------------------------------------
-      // Presets — slot picker + explicit Save, no separate "arm save mode"
+      // Presets, slot picker + explicit Save, no separate "arm save mode"
       // step. Same dual-layer persistence (localStorage + file) as before.
       // ------------------------------------------------------------------
       // Config's picker chooses the SAVE TARGET only -- it deliberately does
@@ -273,7 +273,7 @@ angular.module('beamng.apps')
       };
 
       // ------------------------------------------------------------------
-      // HUD opacity — applied as CSS custom properties on the root element.
+      // HUD opacity, applied as CSS custom properties on the root element.
       // ------------------------------------------------------------------
       // Nothing here rebuilds a style object any more. The slider's only job
       // is to keep $scope.hudOpacity current; the link fn below mirrors it

@@ -63,7 +63,7 @@ local function onUpdate(dtReal)
 end
 
 local function onExtensionLoaded()
-  log('I', 'absCmdChannel', 'loaded — polling ' .. CMD .. ' every ' .. POLL .. 's')
+  log('I', 'absCmdChannel', 'loaded, polling ' .. CMD .. ' every ' .. POLL .. 's')
   os.remove(CMD)                       -- drop any stale command from a previous session
 end
 

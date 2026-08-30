@@ -1,4 +1,4 @@
--- brakeTestUI.lua — GE-side bridge for BrakeTestMod
+-- brakeTestUI.lua: GE-side bridge for BrakeTestMod
 --
 -- Three responsibilities:
 --   1. Auto-load the vlua brakeTest extension into every spawned vehicle
@@ -21,7 +21,7 @@ local PRESET_FILE = "settings/brakeTestMod_presets.json"
 local HISTORY_FILE = "BrakeTestResults_Straight.csv"
 
 -- Same relative-path root as vehicle Lua (both resolve to the userpath's
--- current/ folder) — confirmed empirically: PRESET_FILE above already reads
+-- current/ folder), confirmed empirically: PRESET_FILE above already reads
 -- from there successfully, and BrakeTestResults_Straight.csv (written by
 -- vehicle Lua's brakeTest.lua) lives in that same folder.
 local function splitCSVLine(line)
@@ -52,7 +52,7 @@ end
 
 -- Reads the real run log for the History tab. First pass: re-reads the whole
 -- CSV each call (271 rows today, trivial) rather than maintaining a separate
--- index — fine at this size, worth revisiting if the log grows large.
+-- index, fine at this size, worth revisiting if the log grows large.
 -- Column layout is logToCSV()'s header in brakeTest.lua; this must be kept
 -- in sync with it by hand (no shared schema between the two files).
 local function requestHistory(limit)
@@ -84,8 +84,8 @@ local function requestHistory(limit)
   guihooks.trigger('BrakeTest_OnHistoryLoaded', rows)
 end
 
--- "Delete oldest past N" — keeps the newest `keepCount` rows. Backs up the
--- untrimmed file first (park, don't discard — see project convention) rather
+-- "Delete oldest past N", keeps the newest `keepCount` rows. Backs up the
+-- untrimmed file first (park, don't discard, see project convention) rather
 -- than truly deleting old runs.
 local function trimHistory(keepCount)
   keepCount = tonumber(keepCount) or 200

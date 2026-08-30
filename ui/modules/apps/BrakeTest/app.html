@@ -1,8 +1,8 @@
 <div class="bngApp brakeTestRoot">
   <style>
-    /* Stock-BeamNG palette (Overpass, orange #ff6600) — see docs/GUI_TERMINOLOGY.md.
+    /* Stock-BeamNG palette (Overpass, orange #ff6600), see docs/GUI_TERMINOLOGY.md.
        container-type:size + min(Ncqh,Mcqw) font-sizing is the same technique the
-       original (pre-overhaul) app.html used — it's what makes the HUD scale to
+       original (pre-overhaul) app.html used, it's what makes the HUD scale to
        whatever size the player drags the app window to, instead of staying a
        fixed small block in a tall box. Every structural height/width below is
        cqh/cqw for the same reason; only border-widths stay fixed px. */
@@ -31,7 +31,7 @@
       border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.1667));
       box-shadow: 0 8px 28px rgba(0,0,0, calc(var(--bt-a) * 0.764)), inset 0 1px 0 rgba(255,255,255, calc(var(--bt-a) * 0.111));
       /* cq units on the container ITSELF resolve against the viewport, not this
-         element — frame padding lives on .btBody (a child) for that reason.
+         element: frame padding lives on .btBody (a child) for that reason.
          The 0 !important beats .bngApp's base padding:2px. */
       padding: 0 !important;
       display: flex;
@@ -41,7 +41,7 @@
       user-select: none;
     }
 
-    /* .btBody is everything except the nav rail — it grows to fill whatever
+    /* .btBody is everything except the nav rail, it grows to fill whatever
        height the app window actually is (the reported bug: with fixed/small
        heights, a resized-taller window left a big empty area below). */
     .brakeTestRoot .btBody { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 1.57cqw 1.57cqw 0; }
@@ -133,7 +133,13 @@
 
     .brakeTestRoot .btGWrap { position: relative; height: 24.2cqh; margin: 0.52cqw -1.57cqw 0 -1.57cqw; padding: 0 1.57cqw; overflow: hidden; }
     .brakeTestRoot .btGCurve { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; pointer-events: none; }
-    .brakeTestRoot .btGCurve path { fill: none; stroke: #ff6600; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+    .brakeTestRoot .btGCurve path { fill: none; stroke: #ff6600; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+      /* The SVG uses preserveAspectRatio="none", so x and y scale by
+         different factors and a viewBox-relative stroke renders distorted
+         (thick one way, thin the other). non-scaling-stroke pins the width
+         to device pixels, which is what makes the curve read as a clean
+         line rather than a wobble. */
+      vector-effect: non-scaling-stroke; }
     .brakeTestRoot .btG { position: relative; z-index: 1; color: #fff; font-size: min(23.4cqh, 7cqw); font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .brakeTestRoot .btG small { color: #ff8955; font-size: min(8.9cqh, 3.57cqw); font-weight: 700; }
 
@@ -162,7 +168,7 @@
     .brakeTestRoot .btTabs { flex-shrink: 0; }
     .brakeTestRoot .btRunBtn { flex-shrink: 0; }
 
-    /* Secondary tabs (Config / Settings / Details / History) — same cqh-proportional
+    /* Secondary tabs (Config / Settings / Details / History), same cqh-proportional
        height as Main's natural content, so every tab keeps the same footprint AND
        that footprint scales together with the container, matching Main. */
     .brakeTestRoot .btPanel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -174,14 +180,14 @@
     .brakeTestRoot .btScroll::-webkit-scrollbar-track { background: transparent; }
     .brakeTestRoot .btScroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
     /* Secondary-tab tiles: rows are AT LEAST their natural content height
-       (max-content — must be explicit, because the tiles are overflow:hidden
+       (max-content, must be explicit, because the tiles are overflow:hidden
        which makes the default 'auto' minimum resolve to 0 and lets rows crush
        and clip their own content), and share any spare height 1fr-style when
        the box is taller than the content. When the content is taller than the
        box the grid keeps its natural height and .btScroll scrolls it.
        min-height:0 is load-bearing: without it the grid (a flex item) can't be
        sized to the box, its height goes indefinite, and every 1fr row resolves
-       to the TALLEST row's max-content — the footer row balloons to match the
+       to the TALLEST row's max-content, the footer row balloons to match the
        field tiles and the whole thing overshoots into a needless scrollbar. */
     .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(max-content, 1fr); row-gap: 1.31cqw; column-gap: 1.31cqw; flex: 1; min-height: 0; }
     .brakeTestRoot .btTiles .span2 { grid-column: 1 / -1; }
@@ -253,7 +259,7 @@
       height: 10.52cqh; margin-top: 0.8cqh; font-size: min(7.3cqh, 2.97cqw); font-weight: 700; color: #fff; font-variant-numeric: tabular-nums;
     }
     .brakeTestRoot .btTorqueRow .wheelSpark { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; pointer-events: none; }
-    .brakeTestRoot .btTorqueRow .wheelSpark path { fill: none; stroke: #ff6600; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .brakeTestRoot .btTorqueRow .wheelSpark path { fill: none; stroke: #ff6600; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
     .brakeTestRoot .btTorqueRow .w, .brakeTestRoot .btTorqueRow .n { position: relative; z-index: 1; }
     .brakeTestRoot .btTorqueRow .w { color: #fff; font-size: min(6.47cqh, 2.59cqw); font-weight: 800; }
     .brakeTestRoot .btTorqueRow .n { text-align: right; color: #fff; text-shadow: 0 0 3px rgba(9,12,16,0.9), 0 0 3px rgba(9,12,16,0.9); }
@@ -319,16 +325,16 @@
         <svg class="btGCurve" viewBox="0 0 100 20" preserveAspectRatio="none"><path ng-attr-d="{{ data.decel_path }}" /></svg>
         <div class="btG">{{ data.avg_g || '0.00' }}<small>g</small></div>
       </div>
-      <div class="btRow" ng-class="{'is-off': !data.understeer}">Understeer <b>{{ data.understeer || '—' }}</b><span ng-show="data.understeer">&deg;</span></div>
+      <div class="btRow" ng-class="{'is-off': !data.understeer}">Understeer <b>{{ data.understeer || '--' }}</b><span ng-show="data.understeer">&deg;</span></div>
     </div>
 
     <div class="btTile">
       <button class="btStatusSq" ng-class="detectorSquareClass()" ng-click="toggleDetector()"
-              title="{{ data.detector_enabled ? 'Click to turn the detector off' : 'Detector off — click to turn it back on' }}"></button>
+              title="{{ data.detector_enabled ? 'Click to turn the detector off' : 'Detector off, click to turn it back on' }}"></button>
       <div class="btTileLabel">Speed gates</div>
       <div class="btRow">Brake <b>{{ btInputBrakeMph || '--' }}</b> mph</div>
       <div class="btRow">Record <b>{{ btInputRecordMph || '--' }}</b> mph</div>
-      <div class="btRow" ng-class="{'is-off': !data.actual_start_mph}">Actual <b>{{ data.actual_start_mph || '—' }}</b> mph</div>
+      <div class="btRow" ng-class="{'is-off': !data.actual_start_mph}">Actual <b>{{ data.actual_start_mph || '--' }}</b> mph</div>
     </div>
   </div>
   </div>
