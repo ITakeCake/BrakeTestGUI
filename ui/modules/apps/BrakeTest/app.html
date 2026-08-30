@@ -26,19 +26,19 @@
     /* .btBody is everything except the nav rail — it grows to fill whatever
        height the app window actually is (the reported bug: with fixed/small
        heights, a resized-taller window left a big empty area below). */
-    .brakeTestRoot .btBody { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: max(6px, 1.57cqw) max(6px, 1.57cqw) 0; }
+    .brakeTestRoot .btBody { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 1.57cqw 1.57cqw 0; }
     .brakeTestRoot .btMainBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
     .brakeTestRoot .btNav {
       display: flex;
-      gap: 6px;
+      gap: 1.57cqw;
       align-items: center;
-      margin: 2px 0 0 0;
-      padding: 2px max(6px, 1.57cqw);
+      margin: 0.52cqw 0 0 0;
+      padding: 0.52cqw 1.57cqw;
       border-top: 1px solid rgba(255,255,255,0.07);
       flex-shrink: 0;
     }
-    .brakeTestRoot .btTabs { display: flex; align-items: center; gap: 6px; }
+    .brakeTestRoot .btTabs { display: flex; align-items: center; gap: 1.57cqw; }
     .brakeTestRoot .btTabs span {
       cursor: pointer; padding: 1.17cqh 1.24cqw; line-height: 1.2;
       font-size: min(5.67cqh, 2.21cqw); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
@@ -57,27 +57,38 @@
     .brakeTestRoot .btRunBtn.is-stop:hover { background: rgba(255,68,68,0.34); }
 
     .brakeTestRoot .btWidgets {
-      display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; column-gap: max(5px, 1.31cqw);
+      display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; column-gap: 1.31cqw;
       flex: 1; min-height: 0;
     }
     /* Same as ABSGripGauges' .absGripCell: flex-column + centered, so when the
        tile is taller than its text the content floats in the middle instead of
        clumping at the top with a dead zone underneath. */
     .brakeTestRoot .btTile {
-      padding: max(5px, 1.31cqw) max(6px, 1.57cqw); border: 1px solid rgba(255,255,255,0.09);
+      padding: 1.31cqw 1.57cqw; border: 1px solid rgba(255,255,255,0.09);
       position: relative; overflow: hidden;
       display: flex; flex-direction: column; justify-content: center;
     }
-    /* Main's tiles: content hugs the top and the row is capped near the
-       content's natural height, so a tall app window gets a compact strip
-       plus nav, not three empty towers. */
-    .brakeTestRoot .btWidgets .btTile { justify-content: flex-start; }
+    /* Main's tiles FILL their box instead of clumping at the top. Slack goes
+       BETWEEN the children, so a bigger window spreads the rows apart rather
+       than leaving a void underneath them. Each child keeps its own small
+       margin-top as a MINIMUM separation, which is what holds the layout
+       together at the design size where there is no slack to distribute.
+       Deceleration opts out below by growing its curve instead - a graph reads
+       better tall than a bigger gap does. Even spreading only works if the
+       child COUNT is fixed, which is why Understeer/Actual always render. */
+    .brakeTestRoot .btWidgets .btTile { justify-content: space-between; }
+    /* The one element per tile that is allowed to eat the slack. A grown child
+       consumes the free space, so space-between above resolves to zero here. */
+    .brakeTestRoot .btWidgets .btGWrap { height: auto; flex: 1 1 24.2cqh; min-height: 0; display: flex; align-items: center; }
+    /* A row whose value has not been measured yet: present (so the tile keeps
+       its height) but visibly inert. Mirrors .btField.is-off. */
+    .brakeTestRoot .btRow.is-off { opacity: 0.4; }
     .brakeTestRoot .btTile.span2 { grid-column: 1 / -1; }
     .brakeTestRoot .btTileLabel {
       color: #838e9a; font-size: min(5.67cqh, 2.21cqw); font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
     }
 
-    .brakeTestRoot .btDistRow { display: flex; align-items: flex-end; justify-content: space-between; gap: max(4px, 1.05cqw); margin-top: 2px; }
+    .brakeTestRoot .btDistRow { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.05cqw; margin-top: 0.52cqw; }
     .brakeTestRoot .btBig { color: #fff; font-size: min(23.4cqh, 9.37cqw); font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
     .brakeTestRoot .btBig small { margin-left: 1cqw; color: #ff8955; font-size: min(8.9cqh, 3.57cqw); font-weight: 700; }
     .brakeTestRoot .btMini { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; flex-shrink: 0; }
@@ -85,21 +96,21 @@
     .brakeTestRoot .btMini .val { margin-top: 0.8cqh; font-size: min(10.52cqh, 4.19cqw); font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
     .brakeTestRoot .btMini .val small { font-size: min(6.47cqh, 2.59cqw); font-weight: 700; color: #ff8955; margin-left: 0.38cqw; }
 
-    .brakeTestRoot .btPresets { display: flex; align-items: center; gap: 3px; margin-top: 4px; }
+    .brakeTestRoot .btPresets { display: flex; align-items: center; gap: 0.79cqw; margin-top: 1.05cqw; }
     .brakeTestRoot .btPresets b {
       flex: 1; padding: 1.63cqh 0; text-align: center; font-size: min(8.1cqh, 3.21cqw); font-weight: 900; color: #fff;
       background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.2); cursor: pointer;
     }
     .brakeTestRoot .btPresets b.active { background: #ff6600; border-color: #ff6600; color: #000; }
 
-    .brakeTestRoot .btGWrap { position: relative; height: 24.2cqh; margin: 2px calc(-1 * max(6px, 1.57cqw)) 0 calc(-1 * max(6px, 1.57cqw)); padding: 0 max(6px, 1.57cqw); overflow: hidden; }
+    .brakeTestRoot .btGWrap { position: relative; height: 24.2cqh; margin: 0.52cqw -1.57cqw 0 -1.57cqw; padding: 0 1.57cqw; overflow: hidden; }
     .brakeTestRoot .btGCurve { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; pointer-events: none; }
     .brakeTestRoot .btGCurve path { fill: none; stroke: #ff6600; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
     .brakeTestRoot .btG { position: relative; z-index: 1; color: #fff; font-size: min(23.4cqh, 7cqw); font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .brakeTestRoot .btG small { color: #ff8955; font-size: min(8.9cqh, 3.57cqw); font-weight: 700; }
 
-    .brakeTestRoot .btRow { margin-top: 3px; font-size: min(8.1cqh, 2.8cqw); font-weight: 700; color: #dfe3e6; white-space: nowrap; }
-    .brakeTestRoot .btRow + .btRow { margin-top: 2px; }
+    .brakeTestRoot .btRow { margin-top: 0.79cqw; font-size: min(8.1cqh, 2.8cqw); font-weight: 700; color: #dfe3e6; white-space: nowrap; }
+    .brakeTestRoot .btRow + .btRow { margin-top: 0.52cqw; }
     .brakeTestRoot .btRow b, .brakeTestRoot .btRow .val { color: #fff; font-variant-numeric: tabular-nums; }
     .brakeTestRoot .btRow .val small { font-weight: 600; color: #838e9a; font-size: min(7.3cqh, 2.97cqw); margin-left: 1cqw; }
     .brakeTestRoot .btRow .val.hero { font-size: min(12.15cqh, 4.81cqw); color: #ff8955; }
@@ -143,9 +154,9 @@
        sized to the box, its height goes indefinite, and every 1fr row resolves
        to the TALLEST row's max-content — the footer row balloons to match the
        field tiles and the whole thing overshoots into a needless scrollbar. */
-    .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(max-content, 1fr); row-gap: max(5px, 1.31cqw); column-gap: max(5px, 1.31cqw); flex: 1; min-height: 0; }
+    .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(max-content, 1fr); row-gap: 1.31cqw; column-gap: 1.31cqw; flex: 1; min-height: 0; }
     .brakeTestRoot .btTiles .span2 { grid-column: 1 / -1; }
-    .brakeTestRoot .btTiles .btTile { padding: max(5px, 1.31cqw) max(6px, 1.57cqw); }
+    .brakeTestRoot .btTiles .btTile { padding: 1.31cqw 1.57cqw; }
 
     .brakeTestRoot .btField { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 1.2cqh; font-size: min(6.8cqh, 2.75cqw); font-weight: 600; color: #dfe3e6; white-space: nowrap; }
     .brakeTestRoot .btField:first-of-type { margin-top: 0.8cqh; }
@@ -185,12 +196,12 @@
     .brakeTestRoot .btBtn:disabled { background: rgba(255,255,255,0.06); color: #59616a; cursor: not-allowed; }
 
     .brakeTestRoot .btTorqueHead {
-      display: grid; grid-template-columns: 22px 1fr 1fr 1fr; row-gap: 0.8cqh; column-gap: 1.97cqw; margin-top: 2.42cqh;
+      display: grid; grid-template-columns: 5.76cqw 1fr 1fr 1fr; row-gap: 0.8cqh; column-gap: 1.97cqw; margin-top: 2.42cqh;
       font-size: min(5.67cqh, 2.21cqw); font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em;
     }
     .brakeTestRoot .btTorqueHead span:not(:first-child) { text-align: right; }
     .brakeTestRoot .btTorqueRow {
-      position: relative; display: grid; grid-template-columns: 22px 1fr 1fr 1fr; row-gap: 0.8cqh; column-gap: 1.97cqw; align-items: center;
+      position: relative; display: grid; grid-template-columns: 5.76cqw 1fr 1fr 1fr; row-gap: 0.8cqh; column-gap: 1.97cqw; align-items: center;
       height: 10.52cqh; margin-top: 0.8cqh; font-size: min(7.3cqh, 2.97cqw); font-weight: 700; color: #dfe3e6; font-variant-numeric: tabular-nums;
     }
     .brakeTestRoot .btTorqueRow .wheelSpark { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; pointer-events: none; }
@@ -247,7 +258,7 @@
         <svg class="btGCurve" viewBox="0 0 100 20" preserveAspectRatio="none"><path ng-attr-d="{{ data.decel_path }}" /></svg>
         <div class="btG">{{ data.avg_g || '0.00' }}<small>g</small></div>
       </div>
-      <div class="btRow" ng-if="data.understeer">Understeer <b>{{ data.understeer }}</b>&deg;</div>
+      <div class="btRow" ng-class="{'is-off': !data.understeer}">Understeer <b>{{ data.understeer || '—' }}</b><span ng-show="data.understeer">&deg;</span></div>
     </div>
 
     <div class="btTile" ng-style="hudTileStyle()">
@@ -256,7 +267,7 @@
       <div class="btTileLabel">Speed gates</div>
       <div class="btRow">Brake <b>{{ btInputBrakeMph || '--' }}</b> mph</div>
       <div class="btRow">Record <b>{{ btInputRecordMph || '--' }}</b> mph</div>
-      <div class="btRow" ng-if="data.actual_start_mph">Actual <b>{{ data.actual_start_mph }}</b> mph</div>
+      <div class="btRow" ng-class="{'is-off': !data.actual_start_mph}">Actual <b>{{ data.actual_start_mph || '—' }}</b> mph</div>
     </div>
   </div>
   </div>

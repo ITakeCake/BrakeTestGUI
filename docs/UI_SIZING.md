@@ -42,14 +42,26 @@ capped by width so it never overflows sideways. The cqw cap is tuned to cross
 over at about a 2.5:1 window; wider than that, height wins; taller than that,
 width wins.
 
-**Spacing scales with the window WIDTH only, and never below the mockup's px.**
-The mockup (`Desktop/BrakeTest_Flow_Display.html`) is 382×111.5px with root
-padding `6px`, tile padding `5px 6px`, tile gap `5px`, nav padding `2px 6px`.
-Those are written as `max(6px, 1.57cqw)` etc. — 6px of 382 = 1.57cqw — so a
-window twice as wide gets twice the frame, but a small window never drops
-below the mockup. Scaling by *height* (`cqh`) was the earlier mistake: 6px of
-111.5 = 5.4cqh, which turns into ~20px in a 380px-tall window while the
-width barely changed. The inner chrome (nav's 2px, row gaps) stays plain px.
+**Spacing is pure `cqw`. There are no px layout constants left.** The mockup
+(`Desktop/BrakeTest_Flow_Display.html`) is 382×111.5px with root padding `6px`,
+tile padding `5px 6px`, tile gap `5px`, nav padding `2px 6px`. Every one of
+those is expressed as its share of 382: `6px → 1.57cqw`, `5px → 1.31cqw`,
+`4px → 1.05cqw`, `3px → 0.79cqw`, `2px → 0.52cqw`. Only borders, the
+scrollbar, `border-radius` and `text-shadow` stay px — they are decoration,
+not layout.
+
+Two dead ends are worth not repeating:
+
+- **`cqh` for spacing** was the first mistake: 6px of 111.5 = 5.4cqh, which
+  becomes ~20px in a 380px-tall window while the width barely moved.
+- **`max(6px, 1.57cqw)` floors** were the second. They were a hedge against a
+  narrow-but-tall window collapsing the width-scaled padding — a shape that
+  **can no longer occur**, because the aspect lock (§3b) makes
+  `1cqw = 3.426cqh` a constant. Worse, the plain px that stayed behind
+  (`gap: 6px`, `margin: 2px`, a `22px` grid column) were the `fixed_px` term
+  in `content = k × boxHeight + fixed_px`: as the box grew they stopped
+  mattering and the fill fraction drifted. Purging them is what makes fill
+  **scale-invariant** — identical at 382 wide and at 1152 wide.
 
 ### The gotcha that hid everything: cq units on the container itself
 
@@ -105,10 +117,10 @@ not read the table above as "locked = solved":
    renders when Scripted steering is on, which straight-line runs never use.
    No ratio fills a missing row.
 
-Fixing those means either raising the `cqh` budget so content actually adds up
-to ~100% of the tile, giving one element per tile `flex: 1` so it absorbs the
-slack, or capping the tile row's height so leftover falls below it instead of
-inside it.
+**Both are fixed** (see §4) — scale drift by purging the px constants (§2),
+the short tile by always rendering its optional rows. Measured dead space at
+the bottom of every Main tile is now 1.0px (the border) at 382, 764, 982 and
+1152 wide, in both the empty and the post-run state.
 BeamNG supports this natively: `ui/modules/apps/app.js` honours a **top-level**
 `"preserveAspectRatio": true` in app.json (a sibling of `css`, NOT inside it).
 21 stock apps use it (SimpleTacho, PowerTrainDebug, Compass, SimpleDash...).
@@ -140,9 +152,21 @@ to unlock the ratio.
 ## 4. Tiles fill the window; secondary tabs scroll
 
 - Main's `.btWidgets` grid is `flex: 1` inside `.btMainBody`, so the three
-  tiles stretch to the nav. Tile content hugs the top (`justify-content:
-  flex-start` on Main's tiles; the secondary tabs' tiles are centered like
-  ABSGripGauges cells).
+  tiles stretch to the nav. **Main's tiles then fill themselves**, via three
+  rules that only work together:
+  1. `justify-content: space-between` on `.btWidgets .btTile` — slack goes
+     *between* the rows, not into a void under them. Each child keeps its own
+     small `margin-top` as a **minimum** separation, which is the only thing
+     holding the layout apart at the design size where there is no slack.
+  2. **One element per tile may grow.** Deceleration's `.btGWrap` is
+     `flex: 1 1 24.2cqh`, so the g-curve gets taller instead of the gaps
+     getting wider — a graph reads better tall than a gap does. A grown child
+     eats all the free space, so `space-between` resolves to zero in that tile.
+  3. **The child count must be fixed.** Even spreading breaks if a row appears
+     or vanishes, so Understeer and Actual always render, greyed to `—` via
+     `.btRow.is-off` when unmeasured, rather than `ng-if`-ing away. This is
+     also what stopped Deceleration being structurally short (47% → 100%).
+  The secondary tabs' tiles stay centered, like ABSGripGauges cells.
 - Config / Settings / Details / History each sit in `.btScroll` (`flex: 1;
   overflow-y: auto`). Their `.btTiles` grid uses
   `grid-auto-rows: minmax(max-content, 1fr)` + `min-height: 0`. Both halves
@@ -155,14 +179,27 @@ to unlock the ratio.
 
 ## 5. Testing without the game
 
-There's no committed harness (it's a scratch file), but the recipe is: an HTML
-page that loads AngularJS 1.8 from cdnjs, stubs `window.bngApi.engineLua` to
-log, declares `angular.module('beamng.apps', [])`, includes `app.js`, and
-mounts `<div brake-test>` **inside a replica of the game wrapper** — a
-`.bng-app { position:absolute; overflow:hidden }` box with a `.bngApp
-{ box-sizing:border-box; padding:2px }` base rule, sized to the window you
-want to test. Serve the repo root over HTTP so `/ui/modules/apps/BrakeTest/
-app.html` resolves. Resize the `.bng-app` box, not the page.
+The harness is committed at `tools/sizing-harness.html`. It renders the app at
+four sizes at once inside a replica of the game wrapper and prints, per Main
+tile, the fill %, the dead space at the tile's bottom, and every inter-child
+gap. Run it:
+
+```
+python -m http.server 8731          # from the repo root
+# then open  http://localhost:8731/tools/sizing-harness.html
+#      or    .../tools/sizing-harness.html?pop   for the post-run state
+```
+
+It must be served over HTTP — `app.js`'s `templateUrl` is the absolute path
+`/ui/modules/apps/BrakeTest/app.html`, so `file://` will not resolve it.
+`DEAD-BOTTOM` should read ~1.0px (the border) on every tile at every size; if
+a number climbs with window size, a px layout constant has crept back in (§2).
+
+**Gotcha if you rebuild it:** do not put a literal `ng-transclude` attribute on
+the wrapper div to mimic the game. Angular treats that as its own directive and
+throws `ngTransclude:orphan`, which silently leaves the app unrendered. Use a
+plain class with the same `width/height/box-sizing` — the geometry is what
+matters, not the attribute.
 
 Sizes worth checking every time: `382×111.5` (mockup), `686×380` and
 `985×340` (real in-game windows from screenshots), `1152×490` (the taller

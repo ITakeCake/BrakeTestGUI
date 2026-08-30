@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular.min.js"></script>
+<style>
+  html,body{margin:0;background:#111;font:12px monospace;color:#ddd}
+  /* replica of the game wrapper: ui/modules/apps/bng-app.html + main.css */
+  .bng-app{position:relative;overflow:hidden;margin:14px 0}
+  .bngApp{box-sizing:border-box;padding:2px}
+  #out{white-space:pre;color:#8f8;font-size:13px}
+</style></head><body>
+<div id="stage"></div><pre id="out">measuring...</pre>
+<script>
+window.bngApi={engineLua:function(){},activeObjectLua:function(){}};
+window.StreamsManager={add:function(){},remove:function(){}};
+angular.module('beamng.apps',[]);
+var SIZES=[[382,111.5],[764,223],[982,286.6],[1152,336.3]];
+var stage=document.getElementById('stage');
+SIZES.forEach(function(sz,i){
+  var w=document.createElement('div');
+  w.className='bng-app'; w.style.width=sz[0]+'px'; w.style.height=sz[1]+'px';
+  w.innerHTML='<div class="ngt" style="width:100%;height:100%;box-sizing:border-box"><div brake-test></div></div>';
+  w.setAttribute('data-sz',sz[0]+'x'+sz[1]); stage.appendChild(w);
+});
+</script>
+<script src="/ui/modules/apps/BrakeTest/app.js"></script>
+<script>
+angular.bootstrap(document.getElementById('stage'),['beamng.apps']);
+var POP = location.search.indexOf('pop')>=0;
+setTimeout(function(){
+  if(POP){
+    document.querySelectorAll('.brakeTestRoot').forEach(function(r){
+      var s=angular.element(r).scope();
+      s.$apply(function(){
+        s.data.arc_dist_m='38.42'; s.data.avg_g='1.043'; s.data.avg_wheel_angle='12.4';
+        s.data.understeer='3.1'; s.data.actual_start_mph='60.1';
+        s.data.decel_path='M 0 18 L 20 6 L 50 4 L 80 7 L 100 16';
+      });
+    });
+  }
+  setTimeout(measure,250);
+},400);
+function outer(el){var c=getComputedStyle(el);return el.offsetHeight+parseFloat(c.marginTop)+parseFloat(c.marginBottom);}
+function measure(){
+  var lines=['MODE: '+(POP?'populated (after a run)':'empty (no run yet)'),''];
+  document.querySelectorAll('.bng-app').forEach(function(box){
+    var root=box.querySelector('.brakeTestRoot');
+    var nav=box.querySelector('.btNav');
+    lines.push('--- '+box.getAttribute('data-sz')+'  (root '+root.offsetWidth+'x'+root.offsetHeight+') ---');
+    lines.push('  nav flush gap: '+(root.getBoundingClientRect().bottom-nav.getBoundingClientRect().bottom).toFixed(2)+'px  (want ~1)');
+    box.querySelectorAll('.btWidgets .btTile').forEach(function(t){
+      var cs=getComputedStyle(t);
+      var inner=t.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+      var sum=0,n=0;
+      Array.prototype.forEach.call(t.children,function(ch){
+        if(getComputedStyle(ch).position==='absolute')return;
+        sum+=outer(ch); n++;
+      });
+      var name=(t.querySelector('.btTileLabel')||{textContent:'?'}).textContent.trim();
+      var over = sum>inner+0.5 ? '  OVERFLOW' : '';
+      var tb=t.getBoundingClientRect(), kids=[];
+      Array.prototype.forEach.call(t.children,function(ch){
+        if(getComputedStyle(ch).position==='absolute')return; kids.push(ch.getBoundingClientRect());});
+      var top=kids[0].top-(tb.top+parseFloat(cs.paddingTop));
+      var bot=(tb.bottom-parseFloat(cs.paddingBottom))-kids[kids.length-1].bottom;
+      var gaps=[]; for(var i=1;i<kids.length;i++) gaps.push((kids[i].top-kids[i-1].bottom).toFixed(1));
+      lines.push('  '+(name+'                    ').slice(0,20)+' children='+n+
+        '  fill='+(100*sum/inner).toFixed(0)+'%  DEAD-BOTTOM='+bot.toFixed(1)+'px'+
+        '  top='+top.toFixed(1)+'  gaps=['+gaps.join(', ')+']'+over);
+    });
+    lines.push('');
+  });
+  document.getElementById('out').textContent=lines.join('\n');
+}
+</script></body></html>
