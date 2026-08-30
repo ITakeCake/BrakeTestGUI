@@ -78,16 +78,37 @@ suspect is padding being re-added to `.brakeTestRoot` (including `.bngApp`'s
 ## 3b. The window is aspect-locked (preserveAspectRatio)
 
 This layout is a **wide strip**, not a panel: three tiles of 2-4 lines each
-can't consume height. Measured tile dead space vs. window aspect:
+can't consume height. Dead space in the Distance tile, measured near the
+mockup's scale, against window **aspect**:
 
-| aspect | dead space in each tile |
+| aspect | dead space |
 |---|---|
-| 3.43:1 (design) | ~25% |
+| 3.43:1 (design) | ~20% |
 | 3.0:1 | ~29% |
 | 1.88:1 | ~55% |
 | 1.40:1 | ~64% |
 
 So the app is locked to its design ratio rather than re-tuned for each shape.
+
+**The lock only addresses the aspect axis. Two other causes survive it** - do
+not read the table above as "locked = solved":
+
+1. **Scale drift.** At a *fixed* 3.43:1, fill still falls as the window grows:
+   72% -> 63% -> 60% at 382 -> 764 -> 982 wide. Content height is
+   `k * boxHeight + fixed_px`; as the box grows the fixed px stop mattering and
+   fill converges on `k`, the sum of the `cqh` coefficients, which is only
+   about 0.6. The other ~40% is never allocated to anything. Aspect is
+   irrelevant to this one.
+2. **A structurally short tile.** Deceleration runs ~53% dead at *every* size
+   and *every* ratio (47% even in the mockup). It has two children (label,
+   curve) where Distance has three and Speed Gates has four - Understeer only
+   renders when Scripted steering is on, which straight-line runs never use.
+   No ratio fills a missing row.
+
+Fixing those means either raising the `cqh` budget so content actually adds up
+to ~100% of the tile, giving one element per tile `flex: 1` so it absorbs the
+slack, or capping the tile row's height so leftover falls below it instead of
+inside it.
 BeamNG supports this natively: `ui/modules/apps/app.js` honours a **top-level**
 `"preserveAspectRatio": true` in app.json (a sibling of `css`, NOT inside it).
 21 stock apps use it (SimpleTacho, PowerTrainDebug, Compass, SimpleDash...).
