@@ -84,3 +84,24 @@ ever read. The same pattern appears for `throttle`, `clutch` and `steering`.
 Leaving both calls in place preserves current behaviour exactly, because
 `FILTER_DIRECT` wins either way. Removing the `, 1)` line is a no-op refactor
 and safe; changing the surviving filter is **not** — that changes results.
+
+## Open question: the recorded curve shows a ramp
+
+Blake's observation: the recording UI *does* show brake ramping up, which on
+its face looks like it contradicts "instant".
+
+Most likely it does not, because these are different quantities:
+
+- **Brake input** is the pedal value, and that is what `FILTER_DIRECT` makes
+  instant.
+- **Brake torque** is what the sparklines plot (`wr.brakeTorque * input` in
+  `brakeTest.lua`), and the wheel's brake system has its own response.
+- **Deceleration (g)** must ramp regardless — weight transfers forward and the
+  tyres take time to load up. An instant pedal cannot produce an instant g.
+
+So an instant input is fully compatible with a ramped torque and g trace.
+
+**Not verified.** To settle it, log the raw `input.brake` value per physics
+step alongside the torque trace and check whether *that* channel steps or
+ramps. If `input.brake` itself ramps, the filter analysis above is wrong and
+needs revisiting.

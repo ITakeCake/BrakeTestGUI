@@ -77,6 +77,16 @@ function measure(){
     var root=box.querySelector('.brakeTestRoot');
     var nav=box.querySelector('.btNav');
     lines.push('--- '+box.getAttribute('data-sz')+'  (root '+root.offsetWidth+'x'+root.offsetHeight+') ---');
+    // Main must never scroll or clip: .btMainBody has no overflow-y:auto, so
+    // anything too tall is silently cut off by the root's overflow:hidden
+    // rather than becoming a scrollbar. scrollHeight vs clientHeight is the
+    // only honest test -- a fill % under 100 does not prove it fits.
+    var clipped=[];
+    box.querySelectorAll('.btMainBody, .btWidgets, .btWidgets .btTile, .btNav').forEach(function(el){
+      var dv=el.scrollHeight-el.clientHeight, dh=el.scrollWidth-el.clientWidth;
+      if(dv>1||dh>1) clipped.push((el.className.split(' ')[0]||el.tagName)+' +'+dv+'v/+'+dh+'h');
+    });
+    lines.push('  MAIN CLIPPING: '+(clipped.length?('*** '+clipped.join(', ')):'none'));
     lines.push('  --bt-a = '+(getComputedStyle(root).getPropertyValue('--bt-a')||'(unset)').trim());
     lines.push('  nav flush gap: '+(root.getBoundingClientRect().bottom-nav.getBoundingClientRect().bottom).toFixed(2)+'px  (want ~1)');
     box.querySelectorAll('.btWidgets .btTile').forEach(function(t){
