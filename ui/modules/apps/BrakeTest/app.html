@@ -57,9 +57,13 @@
       display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; column-gap: 1.59cqw;
       flex: 1; min-height: 0;
     }
+    /* Same as ABSGripGauges' .absGripCell: flex-column + centered, so when the
+       tile is taller than its text the content floats in the middle instead of
+       clumping at the top with a dead zone underneath. */
     .brakeTestRoot .btTile {
       padding: 4.05cqh 1.97cqw; border: 1px solid rgba(255,255,255,0.09);
       position: relative; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: center;
     }
     .brakeTestRoot .btTile.span2 { grid-column: 1 / -1; }
     .brakeTestRoot .btTileLabel {
@@ -92,6 +96,9 @@
     .brakeTestRoot .btRow b, .brakeTestRoot .btRow .val { color: #fff; font-variant-numeric: tabular-nums; }
     .brakeTestRoot .btRow .val small { font-weight: 600; color: #838e9a; font-size: min(7.3cqh, 2.97cqw); margin-left: 1cqw; }
     .brakeTestRoot .btRow .val.hero { font-size: min(12.15cqh, 4.81cqw); color: #ff8955; }
+    .brakeTestRoot .btPanel .btRow { margin-top: 1.6cqh; font-size: min(7.2cqh, 2.9cqw); }
+    .brakeTestRoot .btPanel .btRow + .btRow { margin-top: 1.1cqh; }
+    .brakeTestRoot .btPanel .btRow .val.hero { font-size: min(9.5cqh, 3.8cqw); }
 
     .brakeTestRoot .btStatusSq {
       position: absolute; top: 3.25cqh; right: 1.24cqw; width: 4.81cqw; height: 4.85cqh; padding: 0;
@@ -117,16 +124,27 @@
     .brakeTestRoot .btScroll::-webkit-scrollbar { width: 5px; }
     .brakeTestRoot .btScroll::-webkit-scrollbar-track { background: transparent; }
     .brakeTestRoot .btScroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
-    .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; row-gap: 4.05cqh; column-gap: 1.59cqw; flex: 1; }
+    /* Secondary-tab tiles: rows are AT LEAST their natural content height
+       (max-content — must be explicit, because the tiles are overflow:hidden
+       which makes the default 'auto' minimum resolve to 0 and lets rows crush
+       and clip their own content), and share any spare height 1fr-style when
+       the box is taller than the content. When the content is taller than the
+       box the grid keeps its natural height and .btScroll scrolls it.
+       min-height:0 is load-bearing: without it the grid (a flex item) can't be
+       sized to the box, its height goes indefinite, and every 1fr row resolves
+       to the TALLEST row's max-content — the footer row balloons to match the
+       field tiles and the whole thing overshoots into a needless scrollbar. */
+    .brakeTestRoot .btTiles { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(max-content, 1fr); row-gap: 2.6cqh; column-gap: 1.59cqw; flex: 1; min-height: 0; }
     .brakeTestRoot .btTiles .span2 { grid-column: 1 / -1; }
+    .brakeTestRoot .btTiles .btTile { padding: 2.2cqh 1.97cqw; }
 
-    .brakeTestRoot .btField { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 2.42cqh; font-size: min(8.9cqh, 3.57cqw); font-weight: 600; color: #dfe3e6; }
-    .brakeTestRoot .btField:first-of-type { margin-top: 1.63cqh; }
-    .brakeTestRoot .btField small { display: block; font-size: min(7.3cqh, 2.97cqw); font-weight: 700; color: #838e9a; }
+    .brakeTestRoot .btField { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 1.2cqh; font-size: min(6.8cqh, 2.75cqw); font-weight: 600; color: #dfe3e6; white-space: nowrap; }
+    .brakeTestRoot .btField:first-of-type { margin-top: 0.8cqh; }
+    .brakeTestRoot .btField small { display: block; font-size: min(5.9cqh, 2.4cqw); font-weight: 700; color: #838e9a; }
     .brakeTestRoot .btField.is-off { opacity: 0.4; }
     .brakeTestRoot .btField input[type="number"] {
       width: 14.8cqw; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: #fff;
-      font-family: inherit; font-size: min(8.9cqh, 3.57cqw); font-weight: 800; text-align: right; padding: 1.63cqh 1.24cqw; outline: none;
+      font-family: inherit; font-size: min(6.8cqh, 2.75cqw); font-weight: 800; text-align: right; padding: 0.9cqh 1.24cqw; outline: none;
     }
     .brakeTestRoot .btField input[type="number"]:focus { border-color: #ff6600; }
     .brakeTestRoot .btSwitch {
@@ -138,9 +156,9 @@
     .brakeTestRoot .btSwitch.on::after { left: 4.56cqw; background: #ff6600; }
     .brakeTestRoot .btOpacityRow { display: flex; align-items: center; gap: 1.24cqw; }
     .brakeTestRoot .btOpacityRow input[type="range"] { width: 19.36cqw; accent-color: #ff6600; }
-    .brakeTestRoot .btOpacityRow b { color: #fff; font-size: min(8.9cqh, 3.57cqw); }
+    .brakeTestRoot .btOpacityRow b { color: #fff; font-size: min(7.2cqh, 2.9cqw); }
 
-    .brakeTestRoot .btFoot2 { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 1.63cqh; font-size: min(8.9cqh, 3.57cqw); color: #dfe3e6; }
+    .brakeTestRoot .btFoot2 { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 0; font-size: min(7.2cqh, 2.9cqw); color: #dfe3e6; }
     .brakeTestRoot .btSlots { display: inline-flex; gap: 0.62cqw; }
     .brakeTestRoot .btSlots b {
       width: 4.56cqw; height: 10.52cqh; display: flex; align-items: center; justify-content: center;
@@ -150,7 +168,7 @@
     .brakeTestRoot .btSlots b.active { background: #ff6600; border-color: #ff6600; color: #000; }
     .brakeTestRoot .btBtn {
       background: #ff6600; color: #000; border: 0; font-family: inherit; font-size: min(8.1cqh, 3.21cqw); font-weight: 900;
-      letter-spacing: 0.05em; text-transform: uppercase; padding: 2.42cqh 2.97cqw; cursor: pointer;
+      letter-spacing: 0.05em; text-transform: uppercase; padding: 1.8cqh 2.97cqw; cursor: pointer;
     }
     .brakeTestRoot .btBtn.ghost { background: rgba(255,255,255,0.08); color: #dfe3e6; border: 1px solid rgba(255,255,255,0.14); }
     .brakeTestRoot .btBtn:disabled { background: rgba(255,255,255,0.06); color: #59616a; cursor: not-allowed; }
