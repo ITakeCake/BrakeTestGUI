@@ -96,10 +96,23 @@ setTimeout(function(){
   // &sc=<px> scrolls the secondary tabs, so a screenshot can show content
   // that lives below the fold (Details' brake-torque grid, History's rows
   // under the frozen header).
-  var SC = parseInt((/[?&]sc=(\d+)/.exec(location.search)||[])[1], 10);
-  if(TAB==='history' && isNaN(SC)) SC=180;
-  if(!isNaN(SC)) setTimeout(function(){
-    document.querySelectorAll('.btScroll').forEach(function(sc){ sc.scrollTop=SC; });
+  var SCRAW = (/[?&]sc=([a-z0-9]+)/.exec(location.search)||[])[1];
+  var SC = parseInt(SCRAW, 10);
+  if(TAB==='history' && SCRAW===undefined) SC=180;
+  setTimeout(function(){
+    // Only the ACTIVE tab's scroller is laid out; the other four are ng-show'd
+    // off and report height 0, so scrolling them is meaningless and computing
+    // offsets against them gives nonsense.
+    var scrollers = [].filter.call(document.querySelectorAll('.btScroll'),
+                                   function(s){ return s.offsetParent !== null; });
+    if(SCRAW==='end'){
+      // Pin the LAST tile to the bottom of the view. Anchoring to an end
+      // rather than a pixel offset survives content above it changing height,
+      // which is how a hardcoded offset silently went stale before.
+      scrollers.forEach(function(scr){ scr.scrollTop = scr.scrollHeight; });
+    } else if(!isNaN(SC)){
+      scrollers.forEach(function(scr){ scr.scrollTop = SC; });
+    }
   },200);
   setTimeout(measure,400);
 },400);
@@ -114,6 +127,10 @@ function measure(){
     // anything too tall is silently cut off by the root's overflow:hidden
     // rather than becoming a scrollbar. scrollHeight vs clientHeight is the
     // only honest test -- a fill % under 100 does not prove it fits.
+    if (box.querySelector('.btMainBody').offsetParent === null) {
+      lines.push('  (Main hidden on this tab, layout metrics skipped)');
+      lines.push(''); return;
+    }
     var clipped=[];
     box.querySelectorAll('.btMainBody, .btWidgets, .btWidgets .btTile, .btNav').forEach(function(el){
       var dv=el.scrollHeight-el.clientHeight, dh=el.scrollWidth-el.clientWidth;
