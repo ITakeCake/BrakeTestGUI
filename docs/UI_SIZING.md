@@ -20,9 +20,10 @@ Two things about this bite:
   It's a base rule for every stock app. Our root uses that class for the
   translucent background, so unless we override it, the game adds 2px on
   every side *on top of* whatever padding we set. That's part of why in-game
-  margins looked fatter than the mockup. The root now sets
-  `padding: 6px 6px 0 !important` — the `!important` exists purely to beat
-  `.bngApp`'s rule.
+  margins looked fatter than the mockup. The root sets `padding: 0 !important`
+  — the `!important` exists purely to beat `.bngApp`'s rule — and the real
+  frame padding lives on `.btBody` instead (see §2 for why it can't live on
+  the root).
 - **The app window's size is whatever the player dragged it to.** It's stored
   per-layout in the game's `uilayout.json`, *not* in `app.json` — `app.json`'s
   `css.width/height` is only the default for a fresh placement. So the app
@@ -40,26 +41,38 @@ capped by width so it never overflows sideways. The cqw cap is tuned to cross
 over at about a 2.5:1 window; wider than that, height wins; taller than that,
 width wins.
 
-**Spacing (padding / margin / gap) is fixed px, NOT cq units.** This was the
-mistake. The mockup (`Desktop/BrakeTest_Flow_Display.html`) is 382×111.5px
-and uses plain px for spacing: root `6px 6px 3px`, tiles `5px 6px`, tile gap
-`5px`, nav `margin: 2px -6px -3px; padding: 2px 6px`. Converting those to cq
-(6px of 111.5 → 5.4cqh) looks identical at 382×111.5 and then scales the
-*margins* up with the window — at 686×380 that "6px" became ~20px. Margins
-should stay hairline while the text grows, so they're px again.
+**Spacing scales with the window WIDTH only, and never below the mockup's px.**
+The mockup (`Desktop/BrakeTest_Flow_Display.html`) is 382×111.5px with root
+padding `6px`, tile padding `5px 6px`, tile gap `5px`, nav padding `2px 6px`.
+Those are written as `max(6px, 1.57cqw)` etc. — 6px of 382 = 1.57cqw — so a
+window twice as wide gets twice the frame, but a small window never drops
+below the mockup. Scaling by *height* (`cqh`) was the earlier mistake: 6px of
+111.5 = 5.4cqh, which turns into ~20px in a 380px-tall window while the
+width barely changed. The inner chrome (nav's 2px, row gaps) stays plain px.
 
-Rule of thumb: **type scales, chrome doesn't.**
+### The gotcha that hid everything: cq units on the container itself
+
+`cqw`/`cqh` resolve against the nearest **ancestor** query container. On
+`.brakeTestRoot` — which *is* the container — there is no ancestor container,
+so they resolve against the **viewport** (the whole game screen in-game, the
+browser window in a harness). That's why the root's padding looked different
+in every environment and never matched its own children. Frame padding
+therefore lives on `.btBody` (a child), never on the root. The root's only
+padding rule is `padding: 0 !important` to cancel `.bngApp`'s 2px.
 
 ## 3. The nav bar is flush to the edges on purpose
 
 In the mockup the nav's `-6px` side margins cancel the root's `6px` side
 padding, and its `-3px` bottom margin cancels the root's `3px` bottom padding,
-so the bar renders edge-to-edge and flush with the bottom. The port keeps the
-side bleed (`margin: 2px -6px 0`) and simply has no root bottom padding
-instead of the negative-margin trick — same visual, less fragile.
+so the bar renders edge-to-edge and flush with the bottom. The port gets the
+same result without negative margins: the root has no padding at all, the
+frame padding sits on `.btBody` (top/sides only), and the nav is `.btBody`'s
+sibling with `margin: 2px 0 0` — so it naturally spans the full width and
+sits on the bottom edge.
 
-If the nav ever floats off the bottom again, the first suspect is padding
-being re-added to `.brakeTestRoot` (including `.bngApp`'s 2px — see §1).
+If the nav ever floats off the bottom or in from the sides again, the first
+suspect is padding being re-added to `.brakeTestRoot` (including `.bngApp`'s
+2px — see §1) or a cq unit sneaking onto the root (§2).
 
 ## 4. Tiles fill the window; secondary tabs scroll
 
