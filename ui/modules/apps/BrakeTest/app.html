@@ -1,11 +1,9 @@
 <div class="bngApp brakeTestRoot">
   <style>
-    /* Stock-BeamNG palette (Overpass, orange #ff6600), see docs/GUI_TERMINOLOGY.md.
-       container-type:size + min(Ncqh,Mcqw) font-sizing is the same technique the
-       original (pre-overhaul) app.html used, it's what makes the HUD scale to
-       whatever size the player drags the app window to, instead of staying a
-       fixed small block in a tall box. Every structural height/width below is
-       cqh/cqw for the same reason; only border-widths stay fixed px. */
+    /* Stock BeamNG palette. container-type:size plus min(Ncqh,Mcqw) font
+       sizing is what makes the HUD scale to whatever size the window is
+       dragged to. Every structural height and width below is cqh or cqw for
+       the same reason; only borders stay in px. See docs/UI_SIZING.md. */
     .brakeTestRoot {
       width: 100%; height: 100%;
       box-sizing: border-box;
@@ -30,9 +28,9 @@
       background: rgba(18,22,28, var(--bt-a));
       border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.1667));
       box-shadow: 0 8px 28px rgba(0,0,0, calc(var(--bt-a) * 0.764)), inset 0 1px 0 rgba(255,255,255, calc(var(--bt-a) * 0.111));
-      /* cq units on the container ITSELF resolve against the viewport, not this
-         element: frame padding lives on .btBody (a child) for that reason.
-         The 0 !important beats .bngApp's base padding:2px. */
+      /* cq units on the container itself resolve against the viewport, so
+         frame padding lives on .btBody instead. The !important beats
+         .bngApp's base padding:2px. */
       padding: 0 !important;
       display: flex;
       flex-direction: column;
@@ -41,9 +39,7 @@
       user-select: none;
     }
 
-    /* .btBody is everything except the nav rail, it grows to fill whatever
-       height the app window actually is (the reported bug: with fixed/small
-       heights, a resized-taller window left a big empty area below). */
+    /* Everything except the nav rail. Grows to fill the window height. */
     .brakeTestRoot .btBody { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 1.57cqw 1.57cqw 0; }
     .brakeTestRoot .btMainBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
@@ -80,9 +76,8 @@
       display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; column-gap: 1.31cqw;
       flex: 1; min-height: 0;
     }
-    /* Same as ABSGripGauges' .absGripCell: flex-column + centered, so when the
-       tile is taller than its text the content floats in the middle instead of
-       clumping at the top with a dead zone underneath. */
+    /* Centred column, so a tile taller than its text floats its content in
+       the middle rather than clumping at the top. */
     .brakeTestRoot .btTile {
       padding: 1.31cqw 1.57cqw;
       background: rgba(255,255,255, calc(var(--bt-a) * 0.065));
@@ -168,9 +163,7 @@
     .brakeTestRoot .btTabs { flex-shrink: 0; }
     .brakeTestRoot .btRunBtn { flex-shrink: 0; }
 
-    /* Secondary tabs (Config / Settings / Details / History), same cqh-proportional
-       height as Main's natural content, so every tab keeps the same footprint AND
-       that footprint scales together with the container, matching Main. */
+    /* Secondary tabs: Config, Settings, Details, History. */
     .brakeTestRoot .btPanel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .brakeTestRoot .btScroll {
       flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding-right: 0.62cqw; scrollbar-gutter: stable;

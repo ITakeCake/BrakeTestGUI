@@ -1,9 +1,8 @@
--- brakeTestUI.lua: GE-side bridge for BrakeTestMod
+-- GE-side bridge to the vehicle extension.
 --
--- Three responsibilities:
---   1. Auto-load the vlua brakeTest extension into every spawned vehicle
---   2. Cache the user's target speed so it survives vehicle switches
---   3. Translate MPH → m/s and relay to the active vehicle
+--   1. Auto-load brakeTest into every spawned vehicle
+--   2. Cache the target speed so it survives a vehicle switch
+--   3. Convert mph to m/s and relay to the active vehicle
 
 local M = {}
 local logTag = "brakeTestUI"
@@ -20,10 +19,8 @@ local cachedDetectorEnabled = true
 local PRESET_FILE = "settings/brakeTestMod_presets.json"
 local HISTORY_FILE = "BrakeTestResults_Straight.csv"
 
--- Same relative-path root as vehicle Lua (both resolve to the userpath's
--- current/ folder), confirmed empirically: PRESET_FILE above already reads
--- from there successfully, and BrakeTestResults_Straight.csv (written by
--- vehicle Lua's brakeTest.lua) lives in that same folder.
+-- Relative paths here resolve to the same userpath current/ folder as the
+-- vehicle VM's, which is where brakeTest.lua writes the results CSV.
 local function splitCSVLine(line)
   local fields = {}
   for field in (line .. ","):gmatch("(.-),") do
@@ -50,11 +47,10 @@ local function requestPresets()
   guihooks.trigger('BrakeTest_OnPresetsLoaded', dataStr)
 end
 
--- Reads the real run log for the History tab. First pass: re-reads the whole
--- CSV each call (271 rows today, trivial) rather than maintaining a separate
--- index, fine at this size, worth revisiting if the log grows large.
--- Column layout is logToCSV()'s header in brakeTest.lua; this must be kept
--- in sync with it by hand (no shared schema between the two files).
+-- Reads the run log for the History tab. Re-reads the whole CSV per call,
+-- which is fine at current size but worth an index if the log grows large.
+-- Column order must be kept in sync with logToCSV() in brakeTest.lua by hand;
+-- there is no shared schema between the two files.
 local function requestHistory(limit)
   limit = tonumber(limit) or 20
   local lines = {}
@@ -67,7 +63,7 @@ local function requestHistory(limit)
   end
 
   local rows = {}
-  -- lines[1] is the header; walk backward for most-recent-first
+  -- lines[1] is the header; walk backward for most-recent-first.
   for i = #lines, 2, -1 do
     if #rows >= limit then break end
     local fld = splitCSVLine(lines[i])
@@ -84,9 +80,8 @@ local function requestHistory(limit)
   guihooks.trigger('BrakeTest_OnHistoryLoaded', rows)
 end
 
--- "Delete oldest past N", keeps the newest `keepCount` rows. Backs up the
--- untrimmed file first (park, don't discard, see project convention) rather
--- than truly deleting old runs.
+-- Keep the newest `keepCount` rows. The untrimmed file is backed up first
+-- rather than discarded, so a mis-click stays recoverable.
 local function trimHistory(keepCount)
   keepCount = tonumber(keepCount) or 200
   local lines = {}
@@ -142,8 +137,8 @@ local function onExtensionLoaded()
   if veh then
     veh:queueLuaCommand("extensions.load('brakeTest')")
   end
-  -- Bootstrap the external command channel whenever the GUI bridge loads, so the
-  -- bash batch-runner can drive runs via files. Safe if it fails / is absent.
+  -- Bring up the file command channel so an external process can drive runs.
+  -- Safe if absent or if loading fails.
   pcall(function() extensions.load('absCmdChannel') end)
 end
 
@@ -207,11 +202,9 @@ local function toggleAutoTestRun()
   end
 end
 
--- exploreFolder accepts a FILE path and opens its folder with the file
--- selected (core/replay.lua does the same with a replay). Resolving through
--- FS:getFileRealPath is what turns our userpath-relative name into something
--- the OS file browser understands; "/" is the userpath root as a fallback,
--- which is where relative io.open() calls land and so where the CSV lives.
+-- exploreFolder takes a file path and opens its folder with the file selected.
+-- getFileRealPath converts the userpath-relative name into an OS path; "/" is
+-- the userpath root, used as a fallback.
 local function openHistoryFolder()
   local real = FS and FS.getFileRealPath and FS:getFileRealPath(HISTORY_FILE)
   if real and real ~= "" then

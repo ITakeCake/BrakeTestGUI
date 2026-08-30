@@ -9,8 +9,8 @@ angular.module('beamng.apps')
       var LUA_PREFIX = 'if not brakeTestUI then extensions.load("brakeTestUI") end; ';
       var NEVER = 'M 0 10 L 100 10';
 
-      // All display numbers are pre-formatted strings pushed from Lua.
-      // JS performs zero calculations on them.
+      // Every display number is a pre-formatted string from Lua. No arithmetic
+      // is done here.
       $scope.data = {
         state: 'idle',
         target_mph: '--',
@@ -29,27 +29,24 @@ angular.module('beamng.apps')
 
       $scope.activeTab = 'main';
 
-      // Config (what THIS TEST is, saved per slot)
+      // Config: what this test is. Saved per slot.
       $scope.btInputBrakeMph = null;
       $scope.btInputRecordMph = null;
       $scope.btInputCoastMph = 2.0;
       $scope.btEnableTurning = false;
       $scope.btInputSteerAmt = 0.0;
       $scope.btInputSteerAtMph = 0.0;
-      // Which speed trips the steering input. Lua only ever receives an
-      // absolute mph; the mode decides which number that is. Binding it to
-      // Record or Brake keeps the trigger correct when those are later
-      // edited, which re-typing the same figure by hand does not.
-      // 'custom' is the default because it is what every existing preset
-      // means -- they predate this control and store a bare number.
+      // Which speed trips the steering. Lua always receives an absolute mph;
+      // the mode only decides which number that is, so binding to Record or
+      // Brake stays correct when those are edited later. 'custom' is the
+      // default because an older preset stores a bare number.
       $scope.btSteerAtMode = 'custom';
 
-      // Settings (how the APP behaves, global, never in a slot)
+      // Settings: how the app behaves. Global, never saved per slot.
       $scope.btAutoTest = false;
       $scope.btInputTelemetryHz = 0;
 
-      // HUD opacity is a pure display preference: persisted per-browser-profile
-      // like the presets' localStorage layer, no Lua involved.
+      // Display-only preference, persisted in localStorage. No Lua involved.
       $scope.hudOpacity = parseInt(window.localStorage.getItem('brakeTestHudOpacity'), 10);
       if (isNaN($scope.hudOpacity)) $scope.hudOpacity = 72;
 
@@ -69,9 +66,8 @@ angular.module('beamng.apps')
       };
 
       // ------------------------------------------------------------------
-      // Config / Settings push: the ONE place that talks to Lua about
-      // parameters, so Apply / Start-run / preset-load / vehicle-switch can
-      // never disagree with each other.
+      // The only place parameters are pushed to Lua, so Apply, Start, preset
+      // load and vehicle switch cannot disagree with each other.
       // ------------------------------------------------------------------
       function readClampedParams() {
         var brakeMph = parseFloat($scope.btInputBrakeMph);
@@ -106,6 +102,8 @@ angular.module('beamng.apps')
         $scope.btInputRecordMph = recordMph;
         $scope.btInputCoastMph = coastMph;
         $scope.btInputSteerAmt = steerAmt;
+        // Write back only in custom mode; the bound modes hide the field and
+        // it still holds the last custom figure.
         if ($scope.btSteerAtMode === 'custom') $scope.btInputSteerAtMph = steerAtMph;
         $scope.btInputTelemetryHz = telemetryHz;
 
@@ -124,8 +122,8 @@ angular.module('beamng.apps')
             'brakeTestUI.setTelemetryHz(' + p.telemetryHz + ')');
         }
         bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setTurningEnabled(' + ($scope.btEnableTurning ? 'true' : 'false') + ')');
-        // Deliberately NOT setAutoTestEnabled here: Lua resets autoState to
-        // "finished" on every call, which would abort a run in progress.
+        // Not setAutoTestEnabled: Lua resets autoState on every call, which
+        // would abort a run in progress.
       };
 
       $scope.applyConfig = function () { $scope.pushAllParams(); };
@@ -140,8 +138,7 @@ angular.module('beamng.apps')
       };
 
       $scope.toggleAutoTest = function () {
-        // Scripted steering only ever runs inside the auto-driver's state
-        // machine, so leaving it checked with automation off would be a lie.
+        // Scripted steering only runs inside the auto-driver's state machine.
         if (!$scope.btAutoTest && $scope.btEnableTurning) {
           $scope.btEnableTurning = false;
           $scope.toggleTurning();
@@ -159,9 +156,8 @@ angular.module('beamng.apps')
         return s === 'accelerating' || s === 'holding' || s === 'coasting' || s === 'braking';
       };
 
-      // Status square: reports the passive detector's state, never toggled by
-      // a click into a fake state: clicking it calls the real Lua setter and
-      // waits for the next payload to confirm.
+      // Reports the detector's real state. A click calls the Lua setter and
+      // waits for the next payload rather than assuming the new state.
       $scope.toggleDetector = function () {
         bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setDetectorEnabled(' + (!$scope.data.detector_enabled ? 'true' : 'false') + ')');
       };
@@ -174,15 +170,13 @@ angular.module('beamng.apps')
       };
 
       // ------------------------------------------------------------------
-      // Presets, slot picker + explicit Save, no separate "arm save mode"
-      // step. Same dual-layer persistence (localStorage + file) as before.
+      // Slot picker plus an explicit Save. Persisted to localStorage and to a
+      // file through Lua.
       // ------------------------------------------------------------------
-      // Config's picker chooses the SAVE TARGET only -- it deliberately does
-      // not load the slot, so an in-progress edit can't be clobbered by a
-      // stray click. It has to be a function on the controller scope: the old
-      // inline assignment wrote into ng-repeat's CHILD scope, shadowing the
-      // parent, so each square latched its own copy and every one of them
-      // could read as active at the same time.
+      // Chooses the save target only; it does not load the slot, so an
+      // in-progress edit survives a stray click. Must be a function on the
+      // controller scope: an inline assignment writes into ng-repeat's child
+      // scope and every square then latches its own copy.
       $scope.selectSlot = function (i) { $scope.activeSlot = i; };
 
       $scope.setSlot = function (i) {
@@ -194,6 +188,7 @@ angular.module('beamng.apps')
         $scope.btInputCoastMph  = parseFloat(p.coast)  || 0;
         $scope.btInputSteerAmt  = parseFloat(p.steer)  || 0;
         $scope.btInputSteerAtMph = parseFloat(p.steerAt) || 0;
+        // An older preset has no steerAtMode; its bare number is a custom speed.
         $scope.btSteerAtMode = p.steerAtMode || 'custom';
         $scope.btInputTelemetryHz = parseFloat(p.telemetryHz) || 0;
         $scope.btAutoTest      = (p.autoTest === true || p.autoTest === 'true');
@@ -235,8 +230,8 @@ angular.module('beamng.apps')
       // ------------------------------------------------------------------
       // History
       // ------------------------------------------------------------------
-      // 25 is a hard ceiling, not a default: the list is un-virtualised and
-      // the CSV read on the GE side is synchronous, so both ends stay cheap.
+      // Hard ceiling: the list is not virtualised and the CSV read is
+      // synchronous, so both ends stay cheap.
       $scope.clampShowLast = function () {
         var n = parseInt($scope.historyShowLast, 10);
         if (isNaN(n) || n < 1) n = 1;
@@ -273,11 +268,10 @@ angular.module('beamng.apps')
       };
 
       // ------------------------------------------------------------------
-      // HUD opacity, applied as CSS custom properties on the root element.
+      // HUD opacity, applied as a CSS custom property on the root element.
       // ------------------------------------------------------------------
-      // Nothing here rebuilds a style object any more. The slider's only job
-      // is to keep $scope.hudOpacity current; the link fn below mirrors it
-      // into the --bt-a custom property, and the stylesheet does the rest.
+      // Only keeps $scope.hudOpacity current. The link fn mirrors it into the
+      // --bt-a custom property and the stylesheet does the rest.
       $scope.updateHudOpacity = function () {
         var val = parseInt($scope.hudOpacity, 10);
         if (isNaN(val)) val = 72;
@@ -349,11 +343,9 @@ angular.module('beamng.apps')
     }],
 
     link: function (scope, element) {
-      // ng-style cannot do this: jqLite's css() assigns to element.style[name],
-      // which silently ignores custom properties -- they need setProperty().
-      // Watching a primitive (not an object literal) also means the watcher
-      // settles immediately instead of being dirty on every single digest,
-      // which is what the ~10 ng-style bindings used to cost every frame.
+      // ng-style cannot set this: jqLite's css() assigns to element.style[name],
+      // which ignores custom properties. Watching a primitive also settles
+      // immediately, where a returned object literal is dirty every digest.
       scope.$watch('hudOpacity', function (v) {
         var a = parseInt(v, 10);
         if (isNaN(a)) a = 72;

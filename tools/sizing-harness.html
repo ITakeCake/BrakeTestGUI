@@ -28,8 +28,8 @@ if (SHOT) { TAB = SHOT; SIZES = [[1000,292]]; }
 else if (TAB) SIZES = [[764,223]];
 if (SHOT) {
   var st=document.createElement('style');
-  // Must beat the harness's own body{background:#111} -- the HUD is
-  // translucent, so a screenshot on flat black would misrepresent it.
+  // Must beat the harness's own body background. The HUD is translucent, so a
+  // screenshot on flat black would misrepresent it.
   st.textContent='body{margin:0;padding:18px;'
     +'background:linear-gradient(160deg,#33404e 0%,#4a5a68 40%,#6b7885 70%,#8a9099 100%)}'
     +'#out{display:none}.bng-app{margin:0}';
@@ -91,8 +91,8 @@ setTimeout(function(){
       });
     });
   }
-  // Scroll History so the frozen header is actually put under load -- an
-  // un-scrolled list proves nothing about position:sticky.
+  // Put the frozen header under load; an un-scrolled list proves nothing
+  // about position:sticky.
   // &sc=<px> scrolls the secondary tabs, so a screenshot can show content
   // that lives below the fold (Details' brake-torque grid, History's rows
   // under the frozen header).
@@ -126,7 +126,7 @@ function measure(){
     // Main must never scroll or clip: .btMainBody has no overflow-y:auto, so
     // anything too tall is silently cut off by the root's overflow:hidden
     // rather than becoming a scrollbar. scrollHeight vs clientHeight is the
-    // only honest test -- a fill % under 100 does not prove it fits.
+    // only honest test; a fill percentage under 100 does not prove it fits.
     if (box.querySelector('.btMainBody').offsetParent === null) {
       lines.push('  (Main hidden on this tab, layout metrics skipped)');
       lines.push(''); return;

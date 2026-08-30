@@ -1,10 +1,9 @@
--- brakeTest.lua: passive brake-event state machine for BrakeTestMod
+-- Passive brake-event state machine.
 --
--- Single source of truth: stopping distance / avg-G are computed ONLY from the
--- true 2kHz velocity (obj:getVelocity()) inside onPhysicsStep. The old
--- electrics.airspeed distance/G path has been removed entirely. Every "did
--- braking start / did the car stop" edge is detected at 2kHz, and duration is
--- accumulated from dtPhys (no frame-rate simTime). UI is pushed at 5Hz from updateGFX.
+-- Distance and average G come only from obj:getVelocity() sampled in
+-- onPhysicsStep at 2 kHz. Every start/stop edge is detected there, and duration
+-- accumulates from dtPhys, so no result depends on frame rate. The UI is pushed
+-- separately at 5 Hz from updateGFX.
 
 local M = {}
 
@@ -32,14 +31,6 @@ local brakePrevPos        = nil
 
 -- Turning evaluation
 local turningEnabled = false
-local lastAvgSteerAngle = nil
-local lastAvgWheelAngle = nil
-local lastUndersteer    = nil
-local lastAchievedYaw   = nil
-
--- Auto Testing
-local autoTestEnabled = false
-local autoState       = "idle" -- "idle" | "accelerating" | "coasting" | "braking" | "finished"
 local accumSteer = 0
 local accumWheelAngle = 0
 local accumUndersteer = 0
@@ -47,31 +38,22 @@ local accumYawRate = 0
 local accumLatG = 0
 local measureSteps = 0
 
--- [LINE TRIGGER 2026-08-26 per Blake] Optional position-line brake trigger for the auto
--- machine. When set, the run becomes: launch-ramp accel -> HOLD speed at brakeStartSpeed ->
--- cross the line -> brake. The line passes through (px,py) perpendicular to travel direction
--- (dx,dy); crossing = signed distance along (dx,dy) >= 0. nil = classic speed-triggered mode.
--- All line-trigger/crash/wrong-way state lives in ONE table (LT), vlua's LuaJIT has a
--- 60-upvalue-per-function cap and onPhysicsStep was already near it.
+-- Optional position-line brake trigger: accelerate, hold speed, brake on
+-- crossing a line through (px,py) perpendicular to travel direction (dx,dy).
+-- nil selects the default speed-triggered mode.
+--
+-- Line-trigger, crash and wrong-way state all share ONE table on purpose.
+-- LuaJIT caps a function at 60 upvalues and onPhysicsStep is already near it,
+-- so state added there must go in an existing table, never a new local.
 local LT = { line = nil, ramp = false, launchT = 0, gearT = 0, dmg0 = 0, minD = nil }
--- [GEAR RETRY 2026-08-26] On 0.39 a shiftToGearIndex issued shortly after a vehicle
--- repair (setPositionRotation) can silently no-op, leaving the box in N while the auto
--- machine floors it. Retry the shift every 2s while accelerating from ~standstill.
-
--- [CRASH DETECT 2026-08-26 per Blake] If the car takes real damage mid-run, end the run
--- immediately and stamp the done-signal DAMAGED so the runner can skip/flag it. Baseline
--- captured at run start; threshold is beamstate.damage delta, tune if the bump/jump
--- areas false-positive (suspension work on jumps adds some damage).
-
--- [WRONG WAY 2026-08-26 per Blake] Pre-braking, the car should be closing on the stop
--- line. Track the closest approach; if we then move AWAY by more than the buffer while
--- not yet braking, end the run as WRONG_WAY (bad heading / drove past sideways).
-
--- (writeDone lives below currentRunID's declaration, vlua local-ordering trap: an
--- upvalue must be declared BEFORE the function that closes over it, or it reads a nil
--- global instead. This bug made every done-file report runID="?".)
--- Hold-phase brake is clamped BELOW the measurement machine's 0.05 arming threshold, so a
--- speed trim on a downhill approach can never arm/contaminate the metric.
+-- gearT: a shift issued just after a vehicle repair can silently no-op and
+-- leave the box in neutral, so retry every 2s while accelerating from a stop.
+-- dmg0: beamstate.damage baseline; a delta ends the run as DAMAGED.
+-- minD: closest approach to the stop line. Moving away again before braking
+-- means a bad heading, so the run ends as WRONG_WAY.
+--
+-- Hold-phase brake stays below the 0.05 arming threshold so trimming speed on
+-- a downhill approach can never arm the measurement.
 
 -- Telemetry Settings
 local telemetryRateHz = 0 -- 0 means disabled
@@ -93,23 +75,18 @@ local lastUndersteer = 0
 local lastAchievedYaw = 0
 local lastAvgLatG = 0
 
--- [FLOW HUD 2026-08-30] Everything added for the HUD overhaul lives in ONE
--- table (same trick as LT above) so onPhysicsStep only gains ONE new upvalue
--- regardless of how much lives inside it, onPhysicsStep is already near
--- vlua's 60-upvalue-per-function cap.
---   detectorEnabled : click-to-disable the passive detector (HUD status square)
---   actualStart     : TRUE airspeed at the waiting->measuring crossing, in m/s.
---                     recordStartSpeed is the TARGET; this is what really
---                     happened. Fixes the CSV's "Actual Start Speed" column,
---                     which was silently just recordStartSpeed all along.
---   decel/torqueFL.. : raw per-tick samples for this run only, downsampled
---                     into SVG path strings once the run ends. Decorative
---                     (HUD sparklines), never touches the distance/G math.
---   *Path / sparkDirty: the built strings and their cache flag. onPhysicsStep
---                     sets sparkDirty when a run ends; updateGFX rebuilds on
---                     the next push and clears it. Setting a field on EXT
---                     costs no new upvalue, which is the whole point of the
---                     table.
+-- Declared here, above logToCSV, because logToCSV logs autoTestEnabled.
+local autoTestEnabled = false
+local autoState       = "idle" -- idle | accelerating | holding | coasting | braking | finished
+local stopTimer       = 0
+
+-- HUD state, in one table for the same upvalue reason as LT above.
+--   detectorEnabled : passive detector on/off, toggled from the status square
+--   actualStart     : real airspeed (m/s) at the waiting->measuring crossing.
+--                     recordStartSpeed is the target; this is what happened.
+--   decel/torque*   : per-run raw samples, downsampled to SVG paths at run end.
+--                     Decorative only, never feeds the distance or G math.
+--   *Path/sparkDirty: built strings and their cache flag.
 local EXT = {
   detectorEnabled = true,
   actualStart = 0,
@@ -146,42 +123,35 @@ end
 local function computeACS(v_initial_ms, d_actual_m, a_long_g, a_lat_g)
     local G = 9.81
     local mu = 1.0 -- Baseline friction assumption
-    
+
     local w_be  = 0.45
     local w_nse = 0.45
     local w_fcu = 0.10
-    
+
     -- Normalized Stopping Efficiency (NSE)
     local d_min = (v_initial_ms^2) / (2 * mu * G)
     local nse = math.min(d_min / math.max(d_actual_m, 0.1), 1.0)
-    
+
     -- Braking Efficiency (BE)
     local available_long = math.sqrt(math.max(mu^2 - a_lat_g^2, 0))
     local be = 0.0
     if available_long > 0 then
         be = math.min(a_long_g / available_long, 1.0)
     end
-    
+
     -- Friction Circle Utilization (FCU)
     local total_g = math.sqrt(a_long_g^2 + a_lat_g^2)
     local fcu = math.min(total_g / mu, 1.0)
-    
+
     local acs = (be^w_be) * (nse^w_nse) * (fcu^w_fcu)
     return acs * 100 -- Convert to percentage
 end
 
--- Downsamples a run's raw per-tick samples into a smooth SVG curve
--- ("d" attribute, viewBox 0 0 100 20) for the HUD sparklines. Decorative only:
--- normalizes to this run's own min/max and never feeds the metric.
---
--- 64 buckets, not 14. Sample supply was never the constraint (EXT.decel and
--- EXT.torque* are filled in onPhysicsStep, so a 2.7 s stop holds ~5400
--- samples); 14 points stretched across a ~500px-wide element just put a
--- visible corner every ~36px. At 64 the spacing is ~8px.
---
--- Emitted as Catmull-Rom converted to cubic beziers rather than straight L
--- segments, so bucket boundaries stop reading as creases. Catmull-Rom can
--- overshoot on noisy input, so control points are clamped to the viewBox.
+-- Downsample per-tick samples into a smooth SVG path (viewBox 0 0 100 20).
+-- Normalized to this run's own min/max; decorative, never feeds the metric.
+-- Catmull-Rom beziers rather than straight segments so bucket boundaries do
+-- not read as creases; control points are clamped because Catmull-Rom can
+-- overshoot on noisy input.
 local SPARK_BUCKETS = 64
 
 local function buildSparkPath(samples)
@@ -195,8 +165,7 @@ local function buildSparkPath(samples)
   local range = hi - lo
   if range < 0.001 then range = 0.001 end
 
-  -- Never ask for more buckets than there are samples, or empty buckets would
-  -- repeat the previous value and flat-spot the curve.
+  -- More buckets than samples would repeat values and flat-spot the curve.
   local buckets = SPARK_BUCKETS
   if n < buckets then buckets = n end
   if buckets < 2 then return "M 0 10 L 100 10" end
@@ -276,37 +245,36 @@ local function logToCSV(isCornering)
     else
         file:close()
     end
-    
+
     file = io.open(filename, "a")
     if not file then return end
-    
+
     if needsHeader then
         file:write("Timestamp,Run ID,Automated,Car,Trim,ABS System,ABS Version,Target Record (mph),Target Brake (mph),Coast Offset (mph),Target Steer Amt,Steer Trigger (mph),Actual Start Speed (mph),Distance (m),Distance (ft),Avg G,True Path (m),True Path (ft),True Path Avg G,Duration (s),Mass (kg),Steer Input,Wheel Angle (deg),Understeer (deg),Achieved Yaw (deg),ACS Score\n")
     end
-    
+
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
     local runID = currentRunID
     local car, trim = getCarInfo()
     local absName, absVer = getABSInfo()
     local automated = autoTestEnabled and "Yes" or "No"
-    
+
     local mass = 0
     if v and v.data and v.data.information then
       mass = v.data.information.mass or v.data.information.weight or 0
     end
-    
+
     local tRecordMph = (recordStartSpeed or 0) * 2.23694
     local tBrakeMph  = (brakeStartSpeed or 0) * 2.23694
     local tCoastMph  = (coastOffset or 0) * 2.23694
     local tSteerAmt  = (steerAmount or 0)
     local tSteerTrig = (steerTriggerSpeed or 0) * 2.23694
-    
+
     file:write(string.format("%s,%s,%s,%s,%s,%s,%s,%.1f,%.1f,%.1f,%.2f,%.1f,%.1f,%.2f,%.2f,%.3f,%.2f,%.2f,%.3f,%.2f,%.1f,%.2f,%.1f,%.1f,%.1f,%.1f\n",
         timestamp, runID, automated, car, trim, absName, absVer,
         tRecordMph, tBrakeMph, tCoastMph, tSteerAmt, tSteerTrig,
-        -- was lastBrakeStartSpeed (= recordStartSpeed, the TARGET), this
-        -- column is named "Actual Start Speed", so it should be the real
-        -- crossing speed instead. See EXT.actualStart above.
+        -- The column is named Actual Start Speed, so it carries the real
+        -- crossing speed rather than the configured target.
         EXT.actualStart * 2.23694,
         lastBrakeDist, lastBrakeDist * 3.28084,
         lastBrakeAvgG,
@@ -317,17 +285,11 @@ local function logToCSV(isCornering)
     ))
     file:close()
 
-    -- Set here (not in onPhysicsStep) purely to avoid adding getCarInfo/os.date
-    -- as extra upvalues on onPhysicsStep, which is already near vlua's 60-cap, 
-    -- logToCSV already computed car/timestamp above, so this is free reuse.
+    -- Set here rather than in onPhysicsStep to keep getCarInfo and os.date off
+    -- its upvalue list. Both values are already computed just above.
     EXT.car     = car
     EXT.timeStr = timestamp:sub(12, 16)
 end
-
--- Auto Testing
-local autoTestEnabled = false
-local autoState       = "idle" -- "idle" | "accelerating" | "coasting" | "braking" | "finished"
-local stopTimer       = 0
 
 -- UI push control
 local uiAccum      = 0
@@ -337,17 +299,13 @@ local forceUiUpdate = false
 
 local lastSentInputs = { th = -1, br = -1, cl = -1, st = -999 }
 
--- input.event's third argument is the input FILTER, not a device or player
--- index: 0 FILTER_KBD, 1 FILTER_PAD, 2 FILTER_DIRECT, 3 FILTER_KBD2. event()
--- only stores it, so a second call with a different filter overwrites the
--- first rather than adding to it. Every channel here used to be sent twice,
--- with 1 then 2; the 1 was dead code -- 2 always won. Only the 2 remains.
+-- The third argument is the input FILTER, not a device index:
+-- 0 KBD, 1 PAD, 2 DIRECT, 3 KBD2. event() only stores it, so a second call
+-- with a different filter overwrites the first.
 --
--- FILTER_DIRECT is the deliberate choice: for non-steering inputs it is the
--- one filter that applies no temporal smoothing, so the pedal value the state
--- machine asks for is the value the vehicle receives. Changing it would
--- change measured results (keyboard's FILTER_KBD ramps brake at 3 units/sec,
--- roughly 333 ms to full). See docs/BRAKE_INPUT.md.
+-- 2 (DIRECT) is deliberate: for non-steering inputs it is the only filter that
+-- applies no smoothing, so the pedal value asked for is the value received.
+-- Changing it changes measured results. See docs/BRAKE_INPUT.md.
 local function applyInputs(th, br, cl, st)
   if th ~= lastSentInputs.th then
     input.event("throttle", th, 2)
@@ -365,7 +323,7 @@ local function applyInputs(th, br, cl, st)
     input.event("steering", st, 2)
     lastSentInputs.st = st
   end
-  
+
   if st ~= 0 then
     electrics.values.steering = st
     electrics.values.steering_input = st
@@ -384,7 +342,7 @@ local function onPhysicsStep(dtPhys)
     local tgtCl = 0
     local tgtSt = 0
 
-    -- [CRASH DETECT] any active phase: real damage ends the run immediately
+    -- Real damage in any active phase ends the run immediately.
     if autoState ~= "idle" and autoState ~= "finished" then
       local dmg = (beamstate and beamstate.damage) or 0
       if (not LT.dmgOk) and dmg - LT.dmg0 > 1500 then
@@ -395,8 +353,8 @@ local function onPhysicsStep(dtPhys)
       end
     end
 
-    -- [WRONG WAY] pre-braking divergence check (line mode only; braking excluded because
-    -- the car legitimately passes the line then)
+    -- Pre-braking divergence check. Line mode only, and not while braking,
+    -- because the car legitimately passes the line then.
     if LT.line and (autoState == "accelerating" or autoState == "holding" or autoState == "coasting") then
       local p = obj:getPosition()
       local along = (p.x - LT.line.px) * LT.line.dx + (p.y - LT.line.py) * LT.line.dy
@@ -414,9 +372,9 @@ local function onPhysicsStep(dtPhys)
 
     if autoState == "idle" then
       autoState = "accelerating"
-      
+
     elseif autoState == "accelerating" then
-      -- [GEAR RETRY] if we're flooring it but not moving, the box is likely stuck in N/P
+      -- Full throttle with no motion means the box is stuck in N or P.
       if airspeed < 0.5 then
         LT.gearT = LT.gearT + dtPhys
         if LT.gearT >= 2.0 then
@@ -428,8 +386,8 @@ local function onPhysicsStep(dtPhys)
       else
         LT.gearT = 0
       end
-      -- [LINE TRIGGER] gentle launch: ramp 0->60% over 2s while below 5 mph (traction-limited
-      -- surfaces: ice/grass/sand), then full throttle.
+      -- Ramp to 60% over 2s below 5 mph so low-grip surfaces can hook up,
+      -- then full throttle.
       if LT.ramp and airspeed < 2.2352 then
         LT.launchT = LT.launchT + dtPhys
         tgtTh = math.min(0.6, 0.6 * LT.launchT / 2.0)
@@ -441,10 +399,8 @@ local function onPhysicsStep(dtPhys)
         autoState = LT.line and "holding" or "coasting"
         tgtTh = 0
       elseif LT.line then
-        -- Safety: crossed the line while still below target speed (approach too short).
-        -- Brake anyway so the car doesn't accelerate off the map. The measurement machine
-        -- will NOT arm (speed < record), so this run produces no CSV row, the runner
-        -- detects that via an unchanged runID and marks the test NO_MEASURE.
+        -- Crossed the line below target speed, so the approach was too short.
+        -- Brake anyway; the measurement will not arm and no CSV row is written.
         local p = obj:getPosition()
         if (p.x - LT.line.px) * LT.line.dx + (p.y - LT.line.py) * LT.line.dy >= 0 then
           autoState = "braking"
@@ -454,7 +410,7 @@ local function onPhysicsStep(dtPhys)
       end
 
     elseif autoState == "holding" then
-      -- [LINE TRIGGER] maintain ~brakeStartSpeed until the car crosses the brake line.
+      -- Hold brakeStartSpeed until the car crosses the brake line.
       local err = brakeStartSpeed - airspeed
       if err > 0.2 then tgtTh = 0.6
       elseif err > -0.2 then tgtTh = 0.2
@@ -471,23 +427,21 @@ local function onPhysicsStep(dtPhys)
       tgtTh = 0
       tgtBr = 0
       tgtCl = 1
-      
+
       if turningEnabled and airspeed <= steerTriggerSpeed then
         tgtSt = steerAmount
-        if lastSentInputs.st ~= steerAmount then -- log('I', 'brakeTest', 'Steering ACTIVATED: ' .. tostring(steerAmount)) 
+        if lastSentInputs.st ~= steerAmount then -- log('I', 'brakeTest', 'Steering ACTIVATED: ' .. tostring(steerAmount))
         end
       end
 
       if airspeed <= brakeStartSpeed then
         autoState = "braking"
         tgtBr = 1
-      -- log('I', 'brakeTest', string.format('Braking started! speed=%.2f, steerTrigger=%.2f, turningEnabled=%s, steerAmt=%.2f', airspeed, steerTriggerSpeed, tostring(turningEnabled), steerAmount))
       end
-      
+
     elseif autoState == "braking" then
       tgtTh = 0
       tgtBr = 1
-      -- log('I', 'brakeTest', string.format('Braking started! speed=%.2f, steerTrigger=%.2f, turningEnabled=%s, steerAmt=%.2f', airspeed, steerTriggerSpeed, tostring(turningEnabled), steerAmount))
       tgtCl = 1
       brakeInput = 1.0
 
@@ -508,23 +462,20 @@ local function onPhysicsStep(dtPhys)
         tgtCl = 0
         tgtSt = 0
         forceUiUpdate = true
-        -- ABS command-channel done-signal. By now the car has been fully stopped
-        -- for ~2s with the brake released, so BrakeTestResults_Straight.csv AND the
-        -- controller's *Dynamic_ABS*.csv are both finalized. The bash batch-runner
-        -- deletes this file before each run and blocks until it reappears.
-        -- Written to current/ (NOT into mods/) so it never triggers a mod hot-reload.
+        -- Done-signal for the command channel. The car has been stopped ~2s with
+        -- the brake released, so every CSV is finalized. Written to current/ and
+        -- never into mods/, which would trigger a hot-reload.
         writeDone("OK")
       end
-      
+
     elseif autoState == "finished" then
       tgtTh = 0
-      -- hold the brake until genuinely stopped, so early aborts (DAMAGED/WRONG_WAY)
-      -- don't leave the car coasting into the next test's teleport
+      -- Hold the brake until genuinely stopped, so an early abort cannot leave
+      -- the car coasting into the next teleport.
       tgtBr = (airspeed > 0.5) and 1 or 0
       tgtCl = 1
       tgtSt = 0
-      -- [FULL STOP 2026-08-26 per Blake] deferred abort done-signal: true velocity
-      -- (this `airspeed` local IS obj:getVelocity():length()) <= 0.2 mph held 1s
+      -- Deferred abort signal: true velocity at or below 0.2 mph held for 1s.
       if LT.pend then
         if airspeed <= 0.09 then
           LT.stopT = (LT.stopT or 0) + dtPhys
@@ -538,7 +489,7 @@ local function onPhysicsStep(dtPhys)
         end
       end
     end
-    
+
     applyInputs(tgtTh, tgtBr, tgtCl, tgtSt)
 
   else
@@ -558,8 +509,8 @@ local function onPhysicsStep(dtPhys)
   end
 
   if brakeState == "idle" then
-    -- Guard: recordStartSpeed > 0 prevents spurious trigger when target not set
-    -- Relaxed the speed check by 1 m/s so it still catches if Brake == Record exactly
+    -- recordStartSpeed > 0 blocks a spurious trigger when no target is set.
+    -- The 1 m/s slack still catches the case where Brake equals Record.
     if EXT.detectorEnabled and brakeInput > 0.05 and airspeed >= (recordStartSpeed - 1.0) and recordStartSpeed > 0 then
       brakeState    = "waiting"
       forceUiUpdate = true
@@ -579,8 +530,7 @@ local function onPhysicsStep(dtPhys)
       EXT.torqueFR  = {}
       EXT.torqueRL  = {}
       EXT.torqueRR  = {}
-      -- [GEAR/RPM 2026-08-26 per Blake] snapshot drivetrain state at measurement start so
-      -- runs are comparable ("are we comparing similar cars"). Stored in LT (upvalue cap).
+      -- Snapshot drivetrain state at measurement start so runs stay comparable.
       LT.gear = tostring(electrics.values.gear or "?")
       LT.rpm  = math.floor((electrics.values.rpm or 0) + 0.5)
 
@@ -590,7 +540,7 @@ local function onPhysicsStep(dtPhys)
       accumYawRate = 0
       accumLatG = 0
       measureSteps = 0
-      
+
       currentRunID = getRunID()
       runAccum = {0,0,0,0}
       runMax = {0,0,0,0}
@@ -605,7 +555,7 @@ local function onPhysicsStep(dtPhys)
           telemetryFile:write("Time(s),FL_Torque(Nm),FR_Torque(Nm),RL_Torque(Nm),RR_Torque(Nm)\n")
         end
       end
-      
+
       forceUiUpdate      = true
     end
 
@@ -628,7 +578,7 @@ local function onPhysicsStep(dtPhys)
           if input == nil then input = electrics.values.brake or 0 end
           bt = wr.brakeTorque * input
         end
-        
+
         local slot = 0
         if w.name == "FL" then slot = 1
         elseif w.name == "FR" then slot = 2
@@ -638,7 +588,7 @@ local function onPhysicsStep(dtPhys)
         if slot > 0 then currentTorques[slot] = bt end
       end
     end
-    
+
     for slot=1,4 do
       local t = currentTorques[slot]
       runAccum[slot] = runAccum[slot] + t
@@ -648,8 +598,8 @@ local function onPhysicsStep(dtPhys)
     end
     dsSteps = dsSteps + 1
 
-    -- HUD sparkline samples (decorative shape only: reuses currentTorques
-    -- already computed above, and a plain velocity derivative for decel).
+    -- Sparkline samples. Reuses currentTorques from above; decel is a plain
+    -- velocity derivative. Shape only, never used for the metric.
     EXT.torqueFL[#EXT.torqueFL + 1] = currentTorques[1]
     EXT.torqueFR[#EXT.torqueFR + 1] = currentTorques[2]
     EXT.torqueRL[#EXT.torqueRL + 1] = currentTorques[3]
@@ -659,22 +609,22 @@ local function onPhysicsStep(dtPhys)
       EXT.decel[#EXT.decel + 1] = instDecelG
     end
     EXT.prevSpeedForDecel = airspeed
-    
+
     if telemetryRateHz > 0 and telemetryFile then
       telemetryTimer = telemetryTimer + dtPhys
       if telemetryTimer >= (1.0 / telemetryRateHz) then
         local tStamp = measureElapsed
-        telemetryFile:write(string.format("%.4f,%.1f,%.1f,%.1f,%.1f\n", 
+        telemetryFile:write(string.format("%.4f,%.1f,%.1f,%.1f,%.1f\n",
           tStamp, dsAccum[1]/dsSteps, dsAccum[2]/dsSteps, dsAccum[3]/dsSteps, dsAccum[4]/dsSteps))
         dsAccum = {0,0,0,0}
         dsSteps = 0
         telemetryTimer = telemetryTimer - (1.0 / telemetryRateHz)
       end
     end
-    
+
     -- ALWAYS accumulate steer and yaw telemetry
     local steerInput = math.abs(electrics.values.steering or 0)
-    
+
     -- Calculate actual average front wheel angle
     local sumFrontAngle = 0
     local frontCount = 0
@@ -689,20 +639,20 @@ local function onPhysicsStep(dtPhys)
       end
     end
     local wheelAngle = frontCount > 0 and (sumFrontAngle / frontCount) or 0
-    
+
     -- Yaw rate and kinematic model
     local yawRate = math.abs(obj:getYawAngularVelocity())
     local speedForAero = math.max(1, airspeed)
     local wheelbase = 2.6
     local kinematicAngle = math.atan((wheelbase * yawRate) / speedForAero)
     local understeer = math.max(0, wheelAngle - kinematicAngle)
-    
+
     accumSteer = accumSteer + steerInput
     accumWheelAngle = accumWheelAngle + wheelAngle
     accumUndersteer = accumUndersteer + understeer
     accumYawRate = accumYawRate + yawRate * dtPhys
     measureSteps = measureSteps + 1
-    
+
     accumLatG = accumLatG + math.abs((sensors.gx or 0) / 9.81)
 
     if airspeed <= 1.0 then  -- stock wheels.lua cutoff (updateBrakingDistance): |v| <= 1.0
@@ -724,8 +674,8 @@ local function onPhysicsStep(dtPhys)
       local distArc = brakeArcDist
       -- Guard: skip result if distance is essentially zero (stopped at target speed)
       if dist > 0.01 then
-        -- Kinematic formula identical to wheels.lua updateBrakingDistance()
-        -- and abstelemetry.lua: -(v_final² - v_target²) / (2 * dist)
+        -- Same kinematic formula as stock wheels.lua updateBrakingDistance():
+        -- -(v_final^2 - v_target^2) / (2 * dist)
         local dv2 = -(airspeed * airspeed - recordStartSpeed * recordStartSpeed)
         local avgDecel = dv2 / (2 * dist)
         local avgDecelArc = distArc > 0.01 and dv2 / (2 * distArc) or 0
@@ -737,9 +687,8 @@ local function onPhysicsStep(dtPhys)
         lastBrakeDistArc    = distArc
         lastBrakeDuration   = measureElapsed
         lastBrakeStartSpeed = recordStartSpeed
-        -- Sparkline paths are NOT built here, deliberately deferred to
-        -- updateGFX (see there) so onPhysicsStep doesn't gain buildSparkPath
-        -- as an extra upvalue on top of everything else it already closes over.
+        -- Paths are built in updateGFX, not here, to keep buildSparkPath off
+        -- onPhysicsStep's upvalue list.
 
         if measureSteps > 0 then
           lastAvgSteerAngle = (accumSteer / measureSteps)
@@ -747,14 +696,14 @@ local function onPhysicsStep(dtPhys)
           lastUndersteer    = (accumUndersteer / measureSteps) * (180 / math.pi)
           lastAchievedYaw   = accumYawRate * (180 / math.pi)
           lastAvgLatG       = accumLatG / measureSteps
-          
+
           local avgYawRate = 0
           if lastBrakeDuration > 0 then
             avgYawRate = lastAchievedYaw / lastBrakeDuration
           end
-          
+
           local isActuallyCornering = turningEnabled or (avgYawRate > 5) or (lastAchievedYaw > 5)
-          
+
           if isActuallyCornering then
             lastACS = computeACS(lastBrakeStartSpeed, dist, lastBrakeAvgG, lastAvgLatG)
           else
@@ -818,10 +767,8 @@ local function updateGFX(dtSim)
     p.actual_start_mph  = string.format("%.2f",  EXT.actualStart * 2.23694)
     p.car               = EXT.car
     p.time_str          = EXT.timeStr
-    -- Built here rather than in onPhysicsStep for upvalue-cap headroom (see
-    -- the EXT comment), and only when a run has actually ended. The payload
-    -- goes out at 5 Hz, so rebuilding all five every push meant scanning
-    -- ~27000 samples a second to produce strings that had not changed.
+    -- Rebuilt only when a run ends. The payload goes out at 5 Hz, so doing
+    -- this every push rescanned ~27000 samples a second for no change.
     if EXT.sparkDirty then
       EXT.decelPath    = buildSparkPath(EXT.decel)
       EXT.torqueFLPath = buildSparkPath(EXT.torqueFL)
@@ -848,19 +795,19 @@ local function updateGFX(dtSim)
         p.acs_score = nil
       end
     end
-    
+
     if lastRunAvg ~= nil then
-      p.bf_avg = { 
-        FL=string.format("%.0f", lastRunAvg[1]), FR=string.format("%.0f", lastRunAvg[2]), 
-        RL=string.format("%.0f", lastRunAvg[3]), RR=string.format("%.0f", lastRunAvg[4]) 
+      p.bf_avg = {
+        FL=string.format("%.0f", lastRunAvg[1]), FR=string.format("%.0f", lastRunAvg[2]),
+        RL=string.format("%.0f", lastRunAvg[3]), RR=string.format("%.0f", lastRunAvg[4])
       }
-      p.bf_max = { 
-        FL=string.format("%.0f", lastRunMax[1]), FR=string.format("%.0f", lastRunMax[2]), 
-        RL=string.format("%.0f", lastRunMax[3]), RR=string.format("%.0f", lastRunMax[4]) 
+      p.bf_max = {
+        FL=string.format("%.0f", lastRunMax[1]), FR=string.format("%.0f", lastRunMax[2]),
+        RL=string.format("%.0f", lastRunMax[3]), RR=string.format("%.0f", lastRunMax[4])
       }
-      p.bf_min = { 
-        FL=string.format("%.0f", lastRunMin[1]), FR=string.format("%.0f", lastRunMin[2]), 
-        RL=string.format("%.0f", lastRunMin[3]), RR=string.format("%.0f", lastRunMin[4]) 
+      p.bf_min = {
+        FL=string.format("%.0f", lastRunMin[1]), FR=string.format("%.0f", lastRunMin[2]),
+        RL=string.format("%.0f", lastRunMin[3]), RR=string.format("%.0f", lastRunMin[4])
       }
     end
   end
@@ -896,8 +843,8 @@ local function onReset()
   measureElapsed     = 0
   uiAccum            = 0
   forceUiUpdate      = true
-  -- brakeTargetSpeed: NOT reset (GE ext re-pushes it; user shouldn't have to re-type)
-  -- lastBrake*: NOT cleared (preserve last result across resets/respawns)
+  -- brakeTargetSpeed is not reset; the GE extension re-pushes it.
+  -- lastBrake* is not cleared, so the last result survives a respawn.
 end
 
 
@@ -906,7 +853,7 @@ local function setTurningEnabled(enabled)
   forceUiUpdate = true
 end
 
--- Click-to-disable the passive detector (HUD status square). Disabling mid-run
+-- Toggle the passive detector from the HUD status square. Disabling mid-run
 -- aborts it immediately, same as releasing the brake would.
 local function setDetectorEnabled(enabled)
   EXT.detectorEnabled = enabled and true or false
@@ -923,8 +870,8 @@ local function setAutoTestEnabled(enabled)
     autoState = "idle"
     applyInputs(0, 0, 0, 0)
   else
-    -- Checking the box merely arms the UI, it waits for START button
-    autoState = "finished" 
+    -- Enabling only arms the UI; the run still waits for START.
+    autoState = "finished"
   end
   forceUiUpdate = true
 end
@@ -942,18 +889,17 @@ local function toggleAutoTestRun()
     LT.gearT = 1.7  -- first retry fires ~0.3s in if the initial shift below no-ops
     LT.dmg0 = (beamstate and beamstate.damage) or 0
     LT.minD = nil
-    -- clear latched results so an unfinalized measurement can't leak the previous
-    -- run's numbers into the done-signal (seen twice: identical dist/g to 4 decimals)
+    -- Clear latched results so an unfinalized measurement cannot leak the
+    -- previous run's numbers into the done-signal.
     lastBrakeDist = nil
     lastBrakeAvgG = nil
     currentRunID = ""
     LT.pend = nil
     LT.stopT = 0
     forceUiUpdate = true
-    -- Force the auto gearbox into Drive at run start. After a vehicle reset (Ctrl+R /
-    -- the batch runner's v:reset()) the box can land in Park/Neutral, leaving the
-    -- throttle inert. shiftToGearIndex index: 1=Park, -1/0/2 = R/N/D (see
-    -- BEAMNG_PLATFORM_QUIRKS). Guarded + pcall'd, a no-op on manual/CVT/absent boxes.
+    -- Force an automatic box into Drive at run start; a vehicle reset can leave
+    -- it in Park or Neutral with the throttle inert. Gear index: 1=P, -1/0/2=R/N/D.
+    -- pcall'd, and a no-op on manual, CVT or absent gearboxes.
     if controller and controller.mainController and controller.mainController.shiftToGearIndex then
       pcall(controller.mainController.shiftToGearIndex, 2)
     end
@@ -964,8 +910,8 @@ local function setTelemetryHz(hz)
   telemetryRateHz = hz or 0
 end
 
--- [LINE TRIGGER] px,py = a point on the line (the recorded stop point); dx,dy = travel
--- direction (start->stop). The line itself is perpendicular to (dx,dy) through (px,py).
+-- px,py is a point on the line; dx,dy is the travel direction. The line runs
+-- perpendicular to (dx,dy) through (px,py).
 local function setBrakeLine(px, py, dx, dy)
   local len = math.sqrt(dx * dx + dy * dy)
   if len < 1e-6 then return end
@@ -1006,9 +952,8 @@ end
 M.clearBrakeLine    = clearBrakeLine
 M.setLaunchRamp     = setLaunchRamp
 
--- Read-only accessor for other vehicle-VM extensions (e.g. absTelemetryLogger) to
--- correlate a braking run with an active Brake Test measurement. Additive only: 
--- does not participate in the measurement math above.
+-- Read-only accessor so other vehicle-VM extensions can correlate their own
+-- logging with an active measurement. Takes no part in the math above.
 M.getMeasurementInfo = function()
   return {
     active        = (brakeState == "measuring"),

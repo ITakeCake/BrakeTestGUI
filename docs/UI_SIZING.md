@@ -95,10 +95,10 @@ suspect is padding re-added to `.brakeTestRoot`, including `.bngApp`'s 2px
 
 ## 3b. The window is aspect-locked
 
-`ui/modules/apps/app.js` honours a **top-level** `"preserveAspectRatio": true`
-in app.json, a sibling of `css` and not inside it. 21 stock apps use it
-(SimpleTacho, PowerTrainDebug, Compass, SimpleDash and others). Our default is
-`764 x 223`, exactly 2x the 382 x 111.5 mockup, so 3.4260:1.
+BeamNG honours a **top-level** `"preserveAspectRatio": true` in app.json, a
+sibling of `css` and not inside it. 31 stock apps use it (SimpleTacho,
+PowerTrainDebug, Compass, SimpleDash and others). Our default is `764 x 223`,
+exactly 2x the 382 x 111.5 mockup, so 3.4260:1.
 
 The reason is that this layout is a wide strip, not a panel. Three tiles of 2
 to 4 lines cannot consume arbitrary height. Dead space in the Distance tile,
@@ -113,13 +113,13 @@ measured near the mockup's scale, against window aspect:
 
 ### How the lock actually behaves
 
-All three of these come from `app.js`:
+Observed behaviour, not documented by the game:
 
-- **The locked ratio is not read from app.json.** It is captured at app load
-  from the live element: `initAspectRatio = offsetWidth / offsetHeight`
-  (`app.js:53`). A window already saved in the game's layout at some other
-  ratio locks to *that*. Changing the app.json default only helps a fresh
-  placement; an existing one must be removed and re-added, or resized first.
+- **The locked ratio is not read from app.json.** It is captured from the live
+  element when the app loads, as its width divided by its height. A window
+  already saved in the game's layout at some other ratio therefore locks to
+  *that*. Changing the app.json default only affects a fresh placement; an
+  existing one must be removed and re-added, or resized first.
 - **No `min-width` or `min-height`, deliberately.** Those apply as real CSS, so
   a floor on either axis would stop the element reaching the size the lock
   computes and would silently break the ratio at small sizes. The resize
@@ -204,7 +204,8 @@ python -m http.server 8731        # from the repo root
 | `/tools/sizing-harness.html` | four sizes with measurements |
 | `...?pop` | same, populated as if a run had just finished |
 | `...?op` | one size, four opacity values, over a bright backdrop |
-| `...?tab=history&sc=180` | one tab, scrolled, History stocked to 25 rows |
+| `...?tab=history&sc=180` | one tab, scrolled by 180px, History stocked to 25 rows |
+| `...?shot=details&sc=end` | scrolled to the end, to capture content below the fold |
 | `...?shot=main` | clean 1000x292 render for README screenshots |
 
 Serve over HTTP. `app.js`'s `templateUrl` is the absolute path

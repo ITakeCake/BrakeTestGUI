@@ -2,7 +2,7 @@
 
 If the HUD and this table disagree, the HUD is wrong.
 
-Covers the 5-tab Flow HUD (Main / Config / Settings / Details / History).
+Covers all five tabs: Main, Config, Settings, Details, History.
 
 ## Main: state and last result
 
@@ -12,7 +12,7 @@ Covers the 5-tab Flow HUD (Main / Config / Settings / Details / History).
 | Wheel | `data.avg_wheel_angle` | `avg_wheel_angle` | Shown only when steering data exists. |
 | Preset strip 1-8 | `activeSlot`, `presets` | none | Click loads that slot (`setSlot`). Full config push, not a display change. |
 | Deceleration | `data.avg_g` | `avg_g` | Chord avg-G, matching the CSV's primary Avg G column. |
-| Decel curve | `data.decel_path` | `decel_path` | 14-point downsample of instantaneous decel samples (`EXT.decel`). Decorative, never feeds the metric. |
+| Decel curve | `data.decel_path` | `decel_path` | 64-point downsample of instantaneous decel samples (`EXT.decel`). Decorative, never feeds the metric. |
 | Understeer | `data.understeer` | `understeer` | Always rendered. Greyed `--` via `.btRow.is-off` when unmeasured, so the tile keeps a fixed child count. |
 | Status square | `detectorSquareClass()` | `state`, `detector_enabled` | Orange waiting, yellow recording (pulses), green done, grey off. Clicking calls `brakeTestUI.setDetectorEnabled()`. A real switch, not a display toggle. |
 | Brake / Record | `btInputBrakeMph`, `btInputRecordMph` | `brakeStartSpeed`, `recordStartSpeed` | Configured targets, read-only here. |
@@ -24,12 +24,12 @@ Covers the 5-tab Flow HUD (Main / Config / Settings / Details / History).
 
 | GUI label | `$scope` var | Lua var | Behaviour |
 |---|---|---|---|
-| Record from | `btInputRecordMph` | `recordStartSpeed` (`brakeTest.lua:812`) | Measurement window opens at or below this. Clamped to Brake at. |
+| Record from | `btInputRecordMph` | `recordStartSpeed`, set by `setTestParams()` | Measurement window opens at or below this. Clamped to Brake at. |
 | Brake at | `btInputBrakeMph` | `brakeStartSpeed` | Auto-driver goes to full brake here. Required. |
 | Coast margin | `btInputCoastMph` | `coastOffset` | Auto-driver accelerates to Brake at plus this, then lifts. Range 0 to 5. |
-| Scripted steering, Enabled | `btEnableTurning` | `turningEnabled` (`:753`) | Auto-driver only. Greys the steer fields when off. |
-| Steer amount | `btInputSteerAmt` | `steerAmount` (`:730`) | Range -1 to +1. Held from trigger until the car stops. |
-| Steer at (Record / Brake / Custom) | `btSteerAtMode` | resolved into `steerTriggerSpeed` (`:731`) | Picks which speed trips the steering. Lua only ever receives an absolute mph; the mode decides which number that is, so Record and Brake stay correct when those values are edited later. |
+| Scripted steering, Enabled | `btEnableTurning` | `turningEnabled`, set by `setTurningEnabled()` | Auto-driver only. Greys the steer fields when off. |
+| Steer amount | `btInputSteerAmt` | `steerAmount`, set by `setSteerParams()` | Range -1 to +1. Held from trigger until the car stops. |
+| Steer at (Record / Brake / Custom) | `btSteerAtMode` | resolved into `steerTriggerSpeed`, set by `setSteerParams()` | Picks which speed trips the steering. Lua only ever receives an absolute mph; the mode decides which number that is, so Record and Brake stay correct when those values are edited later. |
 | Custom steer speed | `btInputSteerAtMph` | same | Shown only in Custom mode. 0 means never. |
 | Slot picker 1-8 | `activeSlot` via `selectSlot()` | none | Selects a save target only, does not load. Must be a function on the controller scope: an inline `activeSlot = s` assigns into `ng-repeat`'s child scope and every slot latches its own copy. |
 | Save to slot | `saveToSlot()` | `brakeTestUI.savePresets` | Dual persistence: localStorage plus `settings/brakeTestMod_presets.json`. Stores `steerAtMode`; a preset without one reads as Custom. |
@@ -39,7 +39,7 @@ Covers the 5-tab Flow HUD (Main / Config / Settings / Details / History).
 
 | GUI label | `$scope` var | Lua var / storage | Behaviour |
 |---|---|---|---|
-| Car drives the run | `btAutoTest` | `autoTestEnabled` (`brakeTest.lua:859`) | Turning it off also turns off Scripted steering (`toggleAutoTest()`), since steering only runs inside the auto-driver's state machine. |
+| Car drives the run | `btAutoTest` | `autoTestEnabled`, set by `setAutoTestEnabled()` | Turning it off also turns off Scripted steering (`toggleAutoTest()`), since steering only runs inside the auto-driver's state machine. |
 | Telemetry Hz | `btInputTelemetryHz` | `setTelemetryHz` | 2 kHz CSV stream rate, 0 is off. Pushes immediately on change. |
 | HUD opacity | `hudOpacity` | localStorage `brakeTestHudOpacity`, no Lua | Client display preference. The directive's `link` fn mirrors it into the `--bt-a` CSS custom property; every translucent surface derives from that in the stylesheet. Coefficients are the old fixed alphas divided by 0.72, so 72% reproduces the original look. Must use `setProperty`: jqLite's `css()` ignores custom properties. |
 | Show last | `historyShowLast` | `requestHistory(n)` | Capped at 25 by `clampShowLast()`. |
@@ -59,10 +59,11 @@ Covers the 5-tab Flow HUD (Main / Config / Settings / Details / History).
 | Understeer | `understeer` |
 | Heading change | `achieved_yaw` |
 | Cornering score | `acs_score` |
-| Brake torque grid and sparklines | `bf_avg`, `bf_max`, `bf_min` scalars, plus `torque_fl_path` and siblings: 14-point downsamples of raw per-tick torque (`EXT.torqueFL` etc). |
+| Brake torque grid and sparklines | `bf_avg`, `bf_max`, `bf_min` scalars, plus `torque_fl_path` and siblings: 64-point downsamples of raw per-tick torque (`EXT.torqueFL` etc). |
 
-Known edge case, unchanged: Scripted steering on with Steer amount 0 still
-forces the cornering score on (`brakeTest.lua:627`).
+Known edge case: Scripted steering on with Steer amount 0 still forces the
+cornering score on, because `isActuallyCornering` ORs `turningEnabled` with the
+measured yaw rather than checking that any steering was actually commanded.
 
 ## History: real past runs from the CSV
 
