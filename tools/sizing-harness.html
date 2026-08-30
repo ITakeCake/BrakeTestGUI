@@ -12,24 +12,40 @@
 window.bngApi={engineLua:function(){},activeObjectLua:function(){}};
 window.StreamsManager={add:function(){},remove:function(){}};
 angular.module('beamng.apps',[]);
-var SIZES=[[382,111.5],[764,223],[982,286.6],[1152,336.3]];
+var OPMODE = /[?&]op(=|&|$)/.test(location.search);  // must not match '?pop'
+// ?op = the HUD-opacity sweep: one size, four alpha values, over a bright
+// backdrop. That is the only way to see whether the shadows and the accent
+// fills actually track --bt-a, since at 72% on black they look identical.
+var SIZES = OPMODE ? [[764,223],[764,223],[764,223],[764,223]]
+                   : [[382,111.5],[764,223],[982,286.6],[1152,336.3]];
+var OPS = [0, 35, 72, 100];
+if (OPMODE) document.body.style.background =
+  'repeating-linear-gradient(45deg,#c8d8e8 0 40px,#e8d8c0 40px 80px)';
 var stage=document.getElementById('stage');
 SIZES.forEach(function(sz,i){
   var w=document.createElement('div');
   w.className='bng-app'; w.style.width=sz[0]+'px'; w.style.height=sz[1]+'px';
   w.innerHTML='<div class="ngt" style="width:100%;height:100%;box-sizing:border-box"><div brake-test></div></div>';
-  w.setAttribute('data-sz',sz[0]+'x'+sz[1]); stage.appendChild(w);
+  w.setAttribute('data-sz', OPMODE ? ('opacity '+OPS[i]+'%') : (sz[0]+'x'+sz[1]));
+  stage.appendChild(w);
 });
 </script>
 <script src="/ui/modules/apps/BrakeTest/app.js"></script>
 <script>
-angular.bootstrap(document.getElementById('stage'),['beamng.apps']);
-var POP = location.search.indexOf('pop')>=0;
+// Bootstrap each box SEPARATELY. The directive deliberately declares no
+// isolate scope, so one bootstrap over the whole stage would hand all four
+// instances a single shared scope and per-box opacity could not be tested --
+// every box would show whichever value was written last.
+document.querySelectorAll('.bng-app').forEach(function(box){
+  angular.bootstrap(box, ['beamng.apps']);
+});
+var POP = /[?&]pop(=|&|$)/.test(location.search);
 setTimeout(function(){
-  if(POP){
-    document.querySelectorAll('.brakeTestRoot').forEach(function(r){
+  if(POP||OPMODE){
+    document.querySelectorAll('.brakeTestRoot').forEach(function(r,i){
       var s=angular.element(r).scope();
       s.$apply(function(){
+        if(OPMODE) s.hudOpacity=OPS[i];
         s.data.arc_dist_m='38.42'; s.data.avg_g='1.043'; s.data.avg_wheel_angle='12.4';
         s.data.understeer='3.1'; s.data.actual_start_mph='60.1';
         s.data.decel_path='M 0 18 L 20 6 L 50 4 L 80 7 L 100 16';
@@ -45,6 +61,7 @@ function measure(){
     var root=box.querySelector('.brakeTestRoot');
     var nav=box.querySelector('.btNav');
     lines.push('--- '+box.getAttribute('data-sz')+'  (root '+root.offsetWidth+'x'+root.offsetHeight+') ---');
+    lines.push('  --bt-a = '+(getComputedStyle(root).getPropertyValue('--bt-a')||'(unset)').trim());
     lines.push('  nav flush gap: '+(root.getBoundingClientRect().bottom-nav.getBoundingClientRect().bottom).toFixed(2)+'px  (want ~1)');
     box.querySelectorAll('.btWidgets .btTile').forEach(function(t){
       var cs=getComputedStyle(t);

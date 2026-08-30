@@ -162,6 +162,14 @@ angular.module('beamng.apps')
       // Presets — slot picker + explicit Save, no separate "arm save mode"
       // step. Same dual-layer persistence (localStorage + file) as before.
       // ------------------------------------------------------------------
+      // Config's picker chooses the SAVE TARGET only -- it deliberately does
+      // not load the slot, so an in-progress edit can't be clobbered by a
+      // stray click. It has to be a function on the controller scope: the old
+      // inline assignment wrote into ng-repeat's CHILD scope, shadowing the
+      // parent, so each square latched its own copy and every one of them
+      // could read as active at the same time.
+      $scope.selectSlot = function (i) { $scope.activeSlot = i; };
+
       $scope.setSlot = function (i) {
         $scope.activeSlot = i;
         var p = $scope.presets[i];
@@ -210,8 +218,18 @@ angular.module('beamng.apps')
       // ------------------------------------------------------------------
       // History
       // ------------------------------------------------------------------
+      // 25 is a hard ceiling, not a default: the list is un-virtualised and
+      // the CSV read on the GE side is synchronous, so both ends stay cheap.
+      $scope.clampShowLast = function () {
+        var n = parseInt($scope.historyShowLast, 10);
+        if (isNaN(n) || n < 1) n = 1;
+        if (n > 25) n = 25;
+        $scope.historyShowLast = n;
+        return n;
+      };
+
       $scope.refreshHistory = function () {
-        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.requestHistory(' + (parseInt($scope.historyShowLast, 10) || 20) + ')');
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.requestHistory(' + $scope.clampShowLast() + ')');
       };
 
       $scope.$on('BrakeTest_OnHistoryLoaded', function (event, rows) {
@@ -236,6 +254,9 @@ angular.module('beamng.apps')
       // ------------------------------------------------------------------
       // HUD opacity — applied as CSS custom properties on the root element.
       // ------------------------------------------------------------------
+      // Nothing here rebuilds a style object any more. The slider's only job
+      // is to keep $scope.hudOpacity current; the link fn below mirrors it
+      // into the --bt-a custom property, and the stylesheet does the rest.
       $scope.updateHudOpacity = function () {
         var val = parseInt($scope.hudOpacity, 10);
         if (isNaN(val)) val = 72;
@@ -243,32 +264,6 @@ angular.module('beamng.apps')
         if (val > 100) val = 100;
         $scope.hudOpacity = val;
         window.localStorage.setItem('brakeTestHudOpacity', String(val));
-      };
-
-      // Coefficients tuned so 72% (the shipped default) reproduces the fixed
-      // values the panel used before this slider existed.
-      $scope.hudRootStyle = function () {
-        var a = ($scope.hudOpacity || 0) / 100;
-        return {
-          background: 'rgba(18, 22, 28, ' + a.toFixed(2) + ')',
-          borderColor: 'rgba(255, 255, 255, ' + (a * 0.1667).toFixed(3) + ')',
-          boxShadow: '0 8px 28px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, ' + (a * 0.111).toFixed(3) + ')'
-        };
-      };
-      $scope.hudTileStyle = function () {
-        var a = ($scope.hudOpacity || 0) / 100;
-        return {
-          background: 'rgba(255, 255, 255, ' + (a * 0.065).toFixed(3) + ')',
-          borderColor: 'rgba(255, 255, 255, ' + (a * 0.125).toFixed(3) + ')',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, ' + (a * 0.083).toFixed(3) + ')'
-        };
-      };
-      $scope.hudNavStyle = function () {
-        var a = ($scope.hudOpacity || 0) / 100;
-        return {
-          background: 'rgba(0, 0, 0, ' + (a * 0.52).toFixed(3) + ')',
-          borderTopColor: 'rgba(255, 255, 255, ' + (a * 0.0972).toFixed(3) + ')'
-        };
       };
 
       // ------------------------------------------------------------------
@@ -330,6 +325,19 @@ angular.module('beamng.apps')
         });
       });
 
-    }]
+    }],
+
+    link: function (scope, element) {
+      // ng-style cannot do this: jqLite's css() assigns to element.style[name],
+      // which silently ignores custom properties -- they need setProperty().
+      // Watching a primitive (not an object literal) also means the watcher
+      // settles immediately instead of being dirty on every single digest,
+      // which is what the ~10 ng-style bindings used to cost every frame.
+      scope.$watch('hudOpacity', function (v) {
+        var a = parseInt(v, 10);
+        if (isNaN(a)) a = 72;
+        element[0].style.setProperty('--bt-a', (a / 100).toFixed(3));
+      });
+    }
   };
 }]);

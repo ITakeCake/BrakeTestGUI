@@ -1,4 +1,4 @@
-<div class="bngApp brakeTestRoot" ng-style="hudRootStyle()">
+<div class="bngApp brakeTestRoot">
   <style>
     /* Stock-BeamNG palette (Overpass, orange #ff6600) — see docs/GUI_TERMINOLOGY.md.
        container-type:size + min(Ncqh,Mcqw) font-sizing is the same technique the
@@ -9,9 +9,27 @@
     .brakeTestRoot {
       width: 100%; height: 100%;
       box-sizing: border-box;
-      color: #f6f7f8;
-      font-family: 'Overpass', 'Inter', sans-serif;
-      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      /* var(--fnt-defs) is BeamNG's OWN fallback chain (ui/entrypoints/main/
+         main.css line 38 uses exactly 'Overpass', var(--fnt-defs)). Matching
+         the game means deferring to that variable, not restating a guess. */
+      font-family: 'Overpass', var(--fnt-defs, 'Inter'), sans-serif;
+      /* Dark native widgets: number spinners, range thumb, scrollbars. One
+         line replaces a pile of -webkit-/-moz- pseudo-element overrides. */
+      color-scheme: dark;
+      /* Thin dark halo so text survives a bright road behind a low-opacity
+         HUD. Two tight shadows read as an outline at this size and stay
+         sharper than -webkit-text-stroke, which thins the glyphs instead. */
+      text-shadow: 0 0 2px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.8);
+      /* --bt-a (0..1) is the HUD opacity, set on this element by the
+         directive's link fn. Every translucent surface in this stylesheet
+         multiplies it by its own tuned constant, so 0 leaves nothing but the
+         text and 1 is fully solid. Declared here with the shipped default so
+         the panel still renders correctly before the watcher first fires. */
+      --bt-a: 0.72;
+      background: rgba(18,22,28, var(--bt-a));
+      border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.1667));
+      box-shadow: 0 8px 28px rgba(0,0,0, calc(var(--bt-a) * 0.764)), inset 0 1px 0 rgba(255,255,255, calc(var(--bt-a) * 0.111));
       /* cq units on the container ITSELF resolve against the viewport, not this
          element — frame padding lives on .btBody (a child) for that reason.
          The 0 !important beats .bngApp's base padding:2px. */
@@ -35,26 +53,28 @@
       align-items: center;
       margin: 0.52cqw 0 0 0;
       padding: 0.52cqw 1.57cqw;
-      border-top: 1px solid rgba(255,255,255,0.07);
+      background: rgba(0,0,0, calc(var(--bt-a) * 0.52));
+      border-top: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.0972));
       flex-shrink: 0;
     }
     .brakeTestRoot .btTabs { display: flex; align-items: center; gap: 1.57cqw; }
     .brakeTestRoot .btTabs span {
       cursor: pointer; padding: 1.17cqh 1.24cqw; line-height: 1.2;
       font-size: min(5.67cqh, 2.21cqw); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-      color: rgba(255,255,255,0.45); white-space: nowrap;
+      color: #fff; white-space: nowrap;
     }
-    .brakeTestRoot .btTabs span:hover { color: #fff; }
+    .brakeTestRoot .btTabs span:hover { color: #fff; background: rgba(255,255,255, calc(var(--bt-a) * 0.139)); }
     .brakeTestRoot .btTabs span.active { color: #fff; border-bottom: 2px solid #ff6600; }
 
     .brakeTestRoot .btRunBtn {
-      min-width: 12.96cqw; padding: 1.17cqh 1.97cqw; border: 1px solid #29cc5a; background: #29cc5a; color: #000;
+      min-width: 12.96cqw; padding: 1.17cqh 1.97cqw;
+      border: 1px solid rgba(41,204,90, calc(var(--bt-a) * 1.389)); background: rgba(41,204,90, calc(var(--bt-a) * 1.389)); color: #fff;
       font-family: inherit; font-size: min(5.67cqh, 2.21cqw); font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;
       cursor: pointer;
     }
-    .brakeTestRoot .btRunBtn:hover { background: #3ee06d; }
-    .brakeTestRoot .btRunBtn.is-stop { background: rgba(255,68,68,0.22); border-color: #ff4444; color: #ff8a8a; }
-    .brakeTestRoot .btRunBtn.is-stop:hover { background: rgba(255,68,68,0.34); }
+    .brakeTestRoot .btRunBtn:hover { background: rgba(62,224,109, calc(var(--bt-a) * 1.389)); }
+    .brakeTestRoot .btRunBtn.is-stop { background: rgba(255,68,68, calc(var(--bt-a) * 0.306)); border-color: rgba(255,68,68, calc(var(--bt-a) * 1.389)); color: #ff8a8a; }
+    .brakeTestRoot .btRunBtn.is-stop:hover { background: rgba(255,68,68, calc(var(--bt-a) * 0.472)); }
 
     .brakeTestRoot .btWidgets {
       display: grid; grid-template-columns: 1.42fr 0.9fr 0.9fr; column-gap: 1.31cqw;
@@ -64,7 +84,10 @@
        tile is taller than its text the content floats in the middle instead of
        clumping at the top with a dead zone underneath. */
     .brakeTestRoot .btTile {
-      padding: 1.31cqw 1.57cqw; border: 1px solid rgba(255,255,255,0.09);
+      padding: 1.31cqw 1.57cqw;
+      background: rgba(255,255,255, calc(var(--bt-a) * 0.065));
+      border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.125));
+      box-shadow: 0 1px 3px rgba(0,0,0, calc(var(--bt-a) * 0.347)), inset 0 1px 0 rgba(255,255,255, calc(var(--bt-a) * 0.083));
       position: relative; overflow: hidden;
       display: flex; flex-direction: column; justify-content: center;
     }
@@ -85,23 +108,28 @@
     .brakeTestRoot .btRow.is-off { opacity: 0.4; }
     .brakeTestRoot .btTile.span2 { grid-column: 1 / -1; }
     .brakeTestRoot .btTileLabel {
-      color: #838e9a; font-size: min(5.67cqh, 2.21cqw); font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
+      color: #fff; font-size: min(5.67cqh, 2.21cqw); font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
     }
 
     .brakeTestRoot .btDistRow { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.05cqw; margin-top: 0.52cqw; }
     .brakeTestRoot .btBig { color: #fff; font-size: min(23.4cqh, 9.37cqw); font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
     .brakeTestRoot .btBig small { margin-left: 1cqw; color: #ff8955; font-size: min(8.9cqh, 3.57cqw); font-weight: 700; }
     .brakeTestRoot .btMini { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; flex-shrink: 0; }
-    .brakeTestRoot .btMini .lbl { font-size: min(4.85cqh, 1.97cqw); font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em; }
+    .brakeTestRoot .btMini .lbl { font-size: min(4.85cqh, 1.97cqw); font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; }
     .brakeTestRoot .btMini .val { margin-top: 0.8cqh; font-size: min(10.52cqh, 4.19cqw); font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
     .brakeTestRoot .btMini .val small { font-size: min(6.47cqh, 2.59cqw); font-weight: 700; color: #ff8955; margin-left: 0.38cqw; }
 
     .brakeTestRoot .btPresets { display: flex; align-items: center; gap: 0.79cqw; margin-top: 1.05cqw; }
     .brakeTestRoot .btPresets b {
-      flex: 1; padding: 1.63cqh 0; text-align: center; font-size: min(8.1cqh, 3.21cqw); font-weight: 900; color: #fff;
-      background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.2); cursor: pointer;
+      /* Mockup: fixed 16px tall on a 111.5px app = 14.35cqh, flex-1 wide,
+         content centred. Padding-driven height made these track the font size
+         instead, losing the mockup's proportion as the window grew. */
+      flex: 1; box-sizing: border-box; height: 14.35cqh; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: min(8.1cqh, 3.21cqw); font-weight: 900; color: #fff;
+      background: rgba(255,255,255, calc(var(--bt-a) * 0.139)); border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.278)); cursor: pointer;
     }
-    .brakeTestRoot .btPresets b.active { background: #ff6600; border-color: #ff6600; color: #000; }
+    .brakeTestRoot .btPresets b.active { background: rgba(255,102,0, calc(var(--bt-a) * 1.389)); border-color: rgba(255,102,0, calc(var(--bt-a) * 1.389)); color: #fff; }
 
     .brakeTestRoot .btGWrap { position: relative; height: 24.2cqh; margin: 0.52cqw -1.57cqw 0 -1.57cqw; padding: 0 1.57cqw; overflow: hidden; }
     .brakeTestRoot .btGCurve { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; pointer-events: none; }
@@ -109,10 +137,10 @@
     .brakeTestRoot .btG { position: relative; z-index: 1; color: #fff; font-size: min(23.4cqh, 7cqw); font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .brakeTestRoot .btG small { color: #ff8955; font-size: min(8.9cqh, 3.57cqw); font-weight: 700; }
 
-    .brakeTestRoot .btRow { margin-top: 0.79cqw; font-size: min(8.1cqh, 2.8cqw); font-weight: 700; color: #dfe3e6; white-space: nowrap; }
+    .brakeTestRoot .btRow { margin-top: 0.79cqw; font-size: min(8.1cqh, 2.8cqw); font-weight: 700; color: #fff; white-space: nowrap; }
     .brakeTestRoot .btRow + .btRow { margin-top: 0.52cqw; }
     .brakeTestRoot .btRow b, .brakeTestRoot .btRow .val { color: #fff; font-variant-numeric: tabular-nums; }
-    .brakeTestRoot .btRow .val small { font-weight: 600; color: #838e9a; font-size: min(7.3cqh, 2.97cqw); margin-left: 1cqw; }
+    .brakeTestRoot .btRow .val small { font-weight: 600; color: #fff; font-size: min(7.3cqh, 2.97cqw); margin-left: 1cqw; }
     .brakeTestRoot .btRow .val.hero { font-size: min(12.15cqh, 4.81cqw); color: #ff8955; }
     .brakeTestRoot .btPanel .btRow { margin-top: 1.6cqh; font-size: min(7.2cqh, 2.9cqw); }
     .brakeTestRoot .btPanel .btRow + .btRow { margin-top: 1.1cqh; }
@@ -129,7 +157,8 @@
     @media (prefers-reduced-motion: reduce) { .brakeTestRoot .btStatusSq.state-recording { animation: none; } }
     @keyframes btRecPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-    .brakeTestRoot .btNavCfg { margin-left: auto; font-size: min(6.3cqh, 2.2cqw); color: rgba(255,255,255,0.45); white-space: nowrap; letter-spacing: 0.02em; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+    .brakeTestRoot .btNavSpacer { flex: 1 1 auto; min-width: 0; }
+    .brakeTestRoot .btNavCfg { font-size: min(6.3cqh, 2.2cqw); color: #fff; white-space: nowrap; letter-spacing: 0.02em; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
     .brakeTestRoot .btTabs { flex-shrink: 0; }
     .brakeTestRoot .btRunBtn { flex-shrink: 0; }
 
@@ -158,17 +187,17 @@
     .brakeTestRoot .btTiles .span2 { grid-column: 1 / -1; }
     .brakeTestRoot .btTiles .btTile { padding: 1.31cqw 1.57cqw; }
 
-    .brakeTestRoot .btField { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 1.2cqh; font-size: min(6.8cqh, 2.75cqw); font-weight: 600; color: #dfe3e6; white-space: nowrap; }
+    .brakeTestRoot .btField { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 1.2cqh; font-size: min(6.8cqh, 2.75cqw); font-weight: 600; color: #fff; white-space: nowrap; }
     .brakeTestRoot .btField:first-of-type { margin-top: 0.8cqh; }
-    .brakeTestRoot .btField small { display: block; font-size: min(5.9cqh, 2.4cqw); font-weight: 700; color: #838e9a; }
+    .brakeTestRoot .btField small { display: block; font-size: min(5.9cqh, 2.4cqw); font-weight: 700; color: #fff; }
     .brakeTestRoot .btField.is-off { opacity: 0.4; }
     .brakeTestRoot .btField input[type="number"] {
-      width: 14.8cqw; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: #fff;
+      width: 14.8cqw; background: rgba(0,0,0, calc(var(--bt-a) * 0.625)); border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.222)); color: #fff;
       font-family: inherit; font-size: min(6.8cqh, 2.75cqw); font-weight: 800; text-align: right; padding: 0.9cqh 1.24cqw; outline: none;
     }
     .brakeTestRoot .btField input[type="number"]:focus { border-color: #ff6600; }
     .brakeTestRoot .btSwitch {
-      width: 8.39cqw; height: 10.52cqh; border: 1px solid rgba(255,255,255,0.16); background: rgba(0,0,0,0.45);
+      width: 8.39cqw; height: 10.52cqh; border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.222)); background: rgba(0,0,0, calc(var(--bt-a) * 0.625));
       position: relative; cursor: pointer; flex-shrink: 0; padding: 0;
     }
     .brakeTestRoot .btSwitch::after { content: ""; position: absolute; top: 0.8cqh; left: 0.38cqw; width: 2.97cqw; height: 7.3cqh; background: #66717b; transition: left 0.15s, background 0.15s; }
@@ -178,58 +207,63 @@
     .brakeTestRoot .btOpacityRow input[type="range"] { width: 19.36cqw; accent-color: #ff6600; }
     .brakeTestRoot .btOpacityRow b { color: #fff; font-size: min(7.2cqh, 2.9cqw); }
 
-    .brakeTestRoot .btFoot2 { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 0; font-size: min(7.2cqh, 2.9cqw); color: #dfe3e6; white-space: nowrap; }
+    .brakeTestRoot .btFoot2 { display: flex; align-items: center; justify-content: space-between; gap: 1.97cqw; margin-top: 0; font-size: min(7.2cqh, 2.9cqw); color: #fff; white-space: nowrap; }
     .brakeTestRoot .btFoot2 > span { display: inline-flex; align-items: center; gap: 0.6cqw; min-width: 0; }
     .brakeTestRoot .btFoot2 > span:first-child { flex-shrink: 1; overflow: hidden; }
     .brakeTestRoot .btSlots { display: inline-flex; gap: 0.62cqw; flex-shrink: 0; }
     .brakeTestRoot .btSlots b {
       width: 4.56cqw; height: 10.52cqh; display: flex; align-items: center; justify-content: center;
-      font-size: min(6.47cqh, 2.59cqw); font-weight: 800; color: #c9d0d7; background: rgba(255,255,255,0.10);
-      border: 1px solid rgba(255,255,255,0.06); cursor: pointer;
+      font-size: min(6.47cqh, 2.59cqw); font-weight: 800; color: #fff; background: rgba(255,255,255, calc(var(--bt-a) * 0.139));
+      border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.083)); cursor: pointer;
     }
-    .brakeTestRoot .btSlots b.active { background: #ff6600; border-color: #ff6600; color: #000; }
+    .brakeTestRoot .btSlots b.active { background: rgba(255,102,0, calc(var(--bt-a) * 1.389)); border-color: rgba(255,102,0, calc(var(--bt-a) * 1.389)); color: #fff; }
     .brakeTestRoot .btBtn {
-      background: #ff6600; color: #000; border: 0; font-family: inherit; font-size: min(6.5cqh, 2.4cqw); font-weight: 900;
+      background: rgba(255,102,0, calc(var(--bt-a) * 1.389)); color: #fff; border: 0; font-family: inherit; font-size: min(6.5cqh, 2.4cqw); font-weight: 900;
       letter-spacing: 0.04em; text-transform: uppercase; padding: 1.5cqh 1.8cqw; cursor: pointer; white-space: nowrap; flex-shrink: 0;
     }
-    .brakeTestRoot .btBtn.ghost { background: rgba(255,255,255,0.08); color: #dfe3e6; border: 1px solid rgba(255,255,255,0.14); }
-    .brakeTestRoot .btBtn:disabled { background: rgba(255,255,255,0.06); color: #59616a; cursor: not-allowed; }
+    .brakeTestRoot .btBtn.ghost { background: rgba(255,255,255, calc(var(--bt-a) * 0.111)); color: #fff; border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.194)); }
+    .brakeTestRoot .btBtn:disabled { background: rgba(255,255,255, calc(var(--bt-a) * 0.083)); color: #fff; opacity: 0.45; cursor: not-allowed; }
 
     .brakeTestRoot .btTorqueHead {
       display: grid; grid-template-columns: 5.76cqw 1fr 1fr 1fr; row-gap: 0.8cqh; column-gap: 1.97cqw; margin-top: 2.42cqh;
-      font-size: min(5.67cqh, 2.21cqw); font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em;
+      font-size: min(5.67cqh, 2.21cqw); font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 0.06em;
     }
     .brakeTestRoot .btTorqueHead span:not(:first-child) { text-align: right; }
     .brakeTestRoot .btTorqueRow {
       position: relative; display: grid; grid-template-columns: 5.76cqw 1fr 1fr 1fr; row-gap: 0.8cqh; column-gap: 1.97cqw; align-items: center;
-      height: 10.52cqh; margin-top: 0.8cqh; font-size: min(7.3cqh, 2.97cqw); font-weight: 700; color: #dfe3e6; font-variant-numeric: tabular-nums;
+      height: 10.52cqh; margin-top: 0.8cqh; font-size: min(7.3cqh, 2.97cqw); font-weight: 700; color: #fff; font-variant-numeric: tabular-nums;
     }
     .brakeTestRoot .btTorqueRow .wheelSpark { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; pointer-events: none; }
     .brakeTestRoot .btTorqueRow .wheelSpark path { fill: none; stroke: #ff6600; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .brakeTestRoot .btTorqueRow .w, .brakeTestRoot .btTorqueRow .n { position: relative; z-index: 1; }
-    .brakeTestRoot .btTorqueRow .w { color: #838e9a; font-size: min(6.47cqh, 2.59cqw); font-weight: 800; }
+    .brakeTestRoot .btTorqueRow .w { color: #fff; font-size: min(6.47cqh, 2.59cqw); font-weight: 800; }
     .brakeTestRoot .btTorqueRow .n { text-align: right; color: #fff; text-shadow: 0 0 3px rgba(9,12,16,0.9), 0 0 3px rgba(9,12,16,0.9); }
 
     .brakeTestRoot .btHistHead {
-      display: grid; grid-template-columns: 1fr 0.6fr 0.9fr 0.6fr 0.7fr; row-gap: 3.25cqh; column-gap: 1.24cqw; padding: 0 0.62cqw 1.63cqh;
-      font-size: min(5.21cqh, 2.1cqw); font-weight: 800; color: #838e9a; text-transform: uppercase; letter-spacing: 0.06em;
+      display: grid; grid-template-columns: 1fr 0.6fr 0.9fr 0.6fr 0.7fr; row-gap: 3.25cqh; column-gap: 1.24cqw;
+      padding: 1.63cqh 0.62cqw;
+      /* Frozen top row. .btPanel.btScroll is the scroll container and this is
+         a direct child of it, which is what makes top:0 stick. The opaque
+         background is mandatory -- without it the rows scroll through it. */
+      position: sticky; top: 0; z-index: 3; background: rgba(18,22,28, calc(var(--bt-a) * 1.306));
+      font-size: min(5.21cqh, 2.1cqw); font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 0.06em;
     }
     .brakeTestRoot .btHistHead span:not(:first-child) { text-align: right; }
     .brakeTestRoot .btHistRow {
       display: grid; grid-template-columns: 1fr 0.6fr 0.9fr 0.6fr 0.7fr; row-gap: 3.25cqh; column-gap: 1.24cqw; align-items: center;
-      padding: 2.42cqh 0.62cqw; border-top: 1px solid rgba(255,255,255,0.07); font-size: min(7.3cqh, 2.97cqw); font-weight: 700;
-      color: #dfe3e6; font-variant-numeric: tabular-nums;
+      padding: 2.42cqh 0.62cqw; border-top: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.097)); font-size: min(7.3cqh, 2.97cqw); font-weight: 700;
+      color: #fff; font-variant-numeric: tabular-nums;
     }
     .brakeTestRoot .btHistRow .hn { text-align: right; }
     .brakeTestRoot .btHistRow.best { color: #fff; }
     .brakeTestRoot .btHistRow.best .hn:nth-child(3) { color: #ff8955; font-weight: 800; }
-    .brakeTestRoot .btHistEmpty { padding: 6.47cqh 0.62cqw; font-size: min(8.1cqh, 3.21cqw); color: #838e9a; text-align: center; }
+    .brakeTestRoot .btHistEmpty { padding: 6.47cqh 0.62cqw; font-size: min(8.1cqh, 3.21cqw); color: #fff; text-align: center; }
     .brakeTestRoot .btHistFoot {
       display: flex; justify-content: space-between; gap: 1.97cqw; margin-top: 3.25cqh; padding-top: 3.25cqh;
-      border-top: 1px solid rgba(255,255,255,0.07); font-size: min(7.3cqh, 2.97cqw); font-weight: 700; color: #838e9a;
+      border-top: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.097)); font-size: min(7.3cqh, 2.97cqw); font-weight: 700; color: #fff;
     }
     .brakeTestRoot .btHistFoot input[type="number"] {
-      width: 12.96cqw; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: #fff;
+      width: 12.96cqw; background: rgba(0,0,0, calc(var(--bt-a) * 0.625)); border: 1px solid rgba(255,255,255, calc(var(--bt-a) * 0.222)); color: #fff;
       font-family: inherit; font-size: min(8.1cqh, 3.21cqw); text-align: right; padding: 0.8cqh 1cqw; outline: none; margin-left: 1cqw;
     }
 
@@ -241,7 +275,7 @@
   <div class="btBody">
   <div class="btMainBody" ng-show="activeTab === 'main'">
   <div class="btWidgets">
-    <div class="btTile" ng-style="hudTileStyle()">
+    <div class="btTile">
       <div class="btTileLabel">Stopping distance</div>
       <div class="btDistRow">
         <div class="btBig">{{ data.arc_dist_m || '--.--' }}<small>m</small></div>
@@ -252,7 +286,7 @@
       </div>
     </div>
 
-    <div class="btTile" ng-style="hudTileStyle()">
+    <div class="btTile">
       <div class="btTileLabel">Deceleration</div>
       <div class="btGWrap">
         <svg class="btGCurve" viewBox="0 0 100 20" preserveAspectRatio="none"><path ng-attr-d="{{ data.decel_path }}" /></svg>
@@ -261,7 +295,7 @@
       <div class="btRow" ng-class="{'is-off': !data.understeer}">Understeer <b>{{ data.understeer || '—' }}</b><span ng-show="data.understeer">&deg;</span></div>
     </div>
 
-    <div class="btTile" ng-style="hudTileStyle()">
+    <div class="btTile">
       <button class="btStatusSq" ng-class="detectorSquareClass()" ng-click="toggleDetector()"
               title="{{ data.detector_enabled ? 'Click to turn the detector off' : 'Detector off — click to turn it back on' }}"></button>
       <div class="btTileLabel">Speed gates</div>
@@ -275,21 +309,21 @@
   <!-- ================= CONFIG: what THIS TEST is. Saved per slot. ================= -->
   <div class="btPanel btScroll" ng-show="activeTab === 'config'">
     <div class="btTiles">
-      <div class="btTile" ng-style="hudTileStyle()">
+      <div class="btTile">
         <div class="btTileLabel">Speeds</div>
         <div class="btField"><span>Record from<small>measuring starts here</small></span><input type="number" min="0" ng-model="btInputRecordMph"></div>
         <div class="btField"><span>Brake at<small>auto-driver brakes here</small></span><input type="number" min="1" ng-model="btInputBrakeMph"></div>
         <div class="btField"><span>Coast margin<small>lift above Brake at</small></span><input type="number" min="0" max="5" step="0.1" ng-model="btInputCoastMph"></div>
       </div>
-      <div class="btTile" ng-style="hudTileStyle()">
+      <div class="btTile">
         <div class="btTileLabel">Scripted steering &middot; auto-driver only</div>
         <div class="btField"><span>Enabled</span><button class="btSwitch" ng-class="{on: btEnableTurning}" ng-click="btEnableTurning = !btEnableTurning; toggleTurning()"></button></div>
         <div class="btField" ng-class="{'is-off': !btEnableTurning}"><span>Steer amount<small>&minus;1 &hellip; +1</small></span><input type="number" min="-1" max="1" step="0.1" ng-model="btInputSteerAmt" ng-disabled="!btEnableTurning"></div>
         <div class="btField" ng-class="{'is-off': !btEnableTurning}"><span>Steer at<small>mph &middot; 0 = never</small></span><input type="number" min="0" step="0.1" ng-model="btInputSteerAtMph" ng-disabled="!btEnableTurning"></div>
       </div>
-      <div class="btTile span2" ng-style="hudTileStyle()">
+      <div class="btTile span2">
         <div class="btFoot2">
-          <span>Slot <span class="btSlots"><b ng-repeat="s in slots" ng-class="{active: activeSlot === s}" ng-click="activeSlot = s">{{ s }}</b></span></span>
+          <span>Slot <span class="btSlots"><b ng-repeat="s in slots" ng-class="{active: activeSlot === s}" ng-click="selectSlot(s)">{{ s }}</b></span></span>
           <span><button class="btBtn ghost" ng-click="saveToSlot()">Save to slot</button> <button class="btBtn" ng-click="applyConfig()">Apply</button></span>
         </div>
       </div>
@@ -299,21 +333,21 @@
   <!-- ================= SETTINGS: how the APP behaves. Global, never in a slot. ================= -->
   <div class="btPanel btScroll" ng-show="activeTab === 'settings'">
     <div class="btTiles">
-      <div class="btTile" ng-style="hudTileStyle()">
+      <div class="btTile">
         <div class="btTileLabel">Auto-driver</div>
         <div class="btField"><span>Car drives the run<small>accelerate, coast, brake, stop</small></span><button class="btSwitch" ng-class="{on: btAutoTest}" ng-click="btAutoTest = !btAutoTest; toggleAutoTest()"></button></div>
       </div>
-      <div class="btTile" ng-style="hudTileStyle()">
+      <div class="btTile">
         <div class="btTileLabel">Logging</div>
         <div class="btField"><span>Telemetry<small>Hz &middot; 0 = off</small></span><input type="number" min="0" max="2000" ng-model="btInputTelemetryHz" ng-change="pushAllParams()"></div>
       </div>
-      <div class="btTile" ng-style="hudTileStyle()">
+      <div class="btTile">
         <div class="btTileLabel">Display</div>
         <div class="btField"><span>HUD opacity</span><span class="btOpacityRow"><input type="range" min="0" max="100" ng-model="hudOpacity" ng-change="updateHudOpacity()"><b>{{ hudOpacity }}%</b></span></div>
       </div>
-      <div class="btTile" ng-style="hudTileStyle()">
+      <div class="btTile">
         <div class="btTileLabel">History</div>
-        <div class="btField"><span>Show last</span><input type="number" min="1" ng-model="historyShowLast"></div>
+        <div class="btField"><span>Show last<small>max 25</small></span><input type="number" min="1" max="25" ng-model="historyShowLast" ng-change="clampShowLast()"></div>
         <div class="btField"><span>Delete oldest past</span><input type="number" min="1" ng-model="historyDeletePast"></div>
       </div>
     </div>
@@ -322,7 +356,7 @@
   <!-- ================= DETAILS: everything Lua sends that Main has no room for. ================= -->
   <div class="btPanel btScroll" ng-show="activeTab === 'details'">
     <div class="btTiles">
-      <div class="btTile" ng-style="hudTileStyle()">
+      <div class="btTile">
         <div class="btTileLabel">Last run</div>
         <div class="btRow">Distance <span class="val">{{ data.arc_dist_m }} m <small>{{ data.arc_dist_ft }} ft</small></span></div>
         <div class="btRow">Chord <span class="val">{{ data.dist_m }} m <small>{{ data.avg_g }} g</small></span></div>
@@ -330,7 +364,7 @@
         <div class="btRow">Start speed <span class="val">{{ data.actual_start_mph }}<small>mph</small></span></div>
         <div class="btRow" ng-if="data.car">Car <span class="val">{{ data.car }}<small>{{ data.time_str }}</small></span></div>
       </div>
-      <div class="btTile" ng-if="data.turning_enabled" ng-style="hudTileStyle()">
+      <div class="btTile" ng-if="data.turning_enabled">
         <div class="btTileLabel">Steering</div>
         <div class="btRow">Avg steer <span class="val">{{ data.avg_steer_input }}<small>0&ndash;1</small></span></div>
         <div class="btRow">Avg wheel angle <span class="val">{{ data.avg_wheel_angle }}<small>deg</small></span></div>
@@ -338,7 +372,7 @@
         <div class="btRow">Heading change <span class="val">{{ data.achieved_yaw }}<small>deg</small></span></div>
         <div class="btRow" ng-if="data.acs_score">Cornering score <span class="val hero">{{ data.acs_score }}<small>ACS</small></span></div>
       </div>
-      <div class="btTile span2" ng-if="data.bf_avg" ng-style="hudTileStyle()">
+      <div class="btTile span2" ng-if="data.bf_avg">
         <div class="btTileLabel">Brake torque &middot; Nm</div>
         <div class="btTorqueHead"><span></span><span>avg</span><span>max</span><span>min</span></div>
         <div class="btTorqueRow">
@@ -369,7 +403,7 @@
     </div>
     <div class="btHistEmpty" ng-if="!historyRows.length">No runs logged yet.</div>
     <div class="btHistFoot">
-      <span>Show last <input type="number" min="1" ng-model="historyShowLast" ng-change="refreshHistory()"></span>
+      <span>Show last <input type="number" min="1" max="25" ng-model="historyShowLast" ng-change="clampShowLast(); refreshHistory()"></span>
       <span>Delete oldest past <input type="number" min="1" ng-model="historyDeletePast"></span>
     </div>
     <button class="btBtn ghost" style="width:100%;margin-top:4px" ng-click="deleteOldestPast()">Trim history</button>
@@ -378,7 +412,7 @@
   <!-- Nav rail: tabs (left) · Start/Stop (right) -->
   </div>
 
-  <div class="btNav" ng-style="hudNavStyle()">
+  <div class="btNav">
     <div class="btTabs">
       <span ng-class="{active: activeTab === 'main'}" ng-click="setTab('main')">Main</span>
       <span ng-class="{active: activeTab === 'config'}" ng-click="setTab('config')">Config</span>
@@ -386,6 +420,7 @@
       <span ng-class="{active: activeTab === 'details'}" ng-click="setTab('details')">Details</span>
       <span ng-class="{active: activeTab === 'history'}" ng-click="setTab('history')">History</span>
     </div>
+    <span class="btNavSpacer"></span>
     <span class="btNavCfg" ng-show="activeTab === 'main'">Coast +{{ btInputCoastMph }} &middot; Steer {{ btEnableTurning ? 'on' : 'off' }} &middot; {{ btInputTelemetryHz || 0 }} Hz</span>
     <button class="btRunBtn" ng-class="{'is-stop': isRunning()}" ng-click="toggleRun()">{{ isRunning() ? 'Stop' : 'Start' }}</button>
   </div>
