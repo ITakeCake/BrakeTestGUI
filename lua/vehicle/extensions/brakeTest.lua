@@ -93,6 +93,27 @@ local lastUndersteer = 0
 local lastAchievedYaw = 0
 local lastAvgLatG = 0
 
+-- [FLOW HUD 2026-08-30] Everything added for the HUD overhaul lives in ONE
+-- table (same trick as LT above) so onPhysicsStep only gains ONE new upvalue
+-- regardless of how much lives inside it — onPhysicsStep is already near
+-- vlua's 60-upvalue-per-function cap.
+--   detectorEnabled : click-to-disable the passive detector (HUD status square)
+--   actualStart     : TRUE airspeed at the waiting->measuring crossing, in m/s.
+--                     recordStartSpeed is the TARGET; this is what really
+--                     happened. Fixes the CSV's "Actual Start Speed" column,
+--                     which was silently just recordStartSpeed all along.
+--   decel/torqueFL.. : raw per-tick samples for this run only, downsampled
+--                     into SVG path strings once the run ends. Decorative
+--                     (HUD sparklines) — never touches the distance/G math.
+local EXT = {
+  detectorEnabled = true,
+  actualStart = 0,
+  prevSpeedForDecel = nil,
+  decel = {}, torqueFL = {}, torqueFR = {}, torqueRL = {}, torqueRR = {},
+  decelPath = "", torqueFLPath = "", torqueFRPath = "", torqueRLPath = "", torqueRRPath = "",
+  car = "", timeStr = "",
+}
+
 local currentRunID = ""
 local runCounter = 1
 local function getRunID()
@@ -139,6 +160,36 @@ local function computeACS(v_initial_ms, d_actual_m, a_long_g, a_lat_g)
     
     local acs = (be^w_be) * (nse^w_nse) * (fcu^w_fcu)
     return acs * 100 -- Convert to percentage
+end
+
+-- Downsamples a run's raw per-tick samples into a 14-point SVG polyline
+-- ("d" attribute, viewBox 0 0 100 20) for the HUD sparklines. Decorative
+-- only — normalizes to this run's own min/max, never feeds the metric.
+local function buildSparkPath(samples)
+  local n = #samples
+  if n == 0 then return "M 0 10 L 100 10" end
+  local lo, hi = samples[1], samples[1]
+  for i = 1, n do
+    if samples[i] < lo then lo = samples[i] end
+    if samples[i] > hi then hi = samples[i] end
+  end
+  local range = hi - lo
+  if range < 0.001 then range = 0.001 end
+  local buckets = 14
+  local parts = {}
+  for b = 0, buckets - 1 do
+    local i0 = math.floor(b * n / buckets) + 1
+    local i1 = math.floor((b + 1) * n / buckets)
+    if i1 < i0 then i1 = i0 end
+    local sum = 0
+    for i = i0, i1 do sum = sum + samples[i] end
+    local avg = sum / (i1 - i0 + 1)
+    local norm = (avg - lo) / range
+    local y = 18 - norm * 16
+    local x = (b / (buckets - 1)) * 100
+    parts[#parts + 1] = string.format("%s%.1f %.1f", (b == 0 and "M " or "L "), x, y)
+  end
+  return table.concat(parts, " ")
 end
 
 local function getCarInfo()
@@ -213,7 +264,10 @@ local function logToCSV(isCornering)
     file:write(string.format("%s,%s,%s,%s,%s,%s,%s,%.1f,%.1f,%.1f,%.2f,%.1f,%.1f,%.2f,%.2f,%.3f,%.2f,%.2f,%.3f,%.2f,%.1f,%.2f,%.1f,%.1f,%.1f,%.1f\n",
         timestamp, runID, automated, car, trim, absName, absVer,
         tRecordMph, tBrakeMph, tCoastMph, tSteerAmt, tSteerTrig,
-        lastBrakeStartSpeed * 2.23694,
+        -- was lastBrakeStartSpeed (= recordStartSpeed, the TARGET) — this
+        -- column is named "Actual Start Speed", so it should be the real
+        -- crossing speed instead. See EXT.actualStart above.
+        EXT.actualStart * 2.23694,
         lastBrakeDist, lastBrakeDist * 3.28084,
         lastBrakeAvgG,
         lastBrakeDistArc or 0, (lastBrakeDistArc or 0) * 3.28084,
@@ -222,6 +276,12 @@ local function logToCSV(isCornering)
         lastAvgSteerAngle or 0, lastAvgWheelAngle or 0, lastUndersteer or 0, lastAchievedYaw or 0, lastACS or 0
     ))
     file:close()
+
+    -- Set here (not in onPhysicsStep) purely to avoid adding getCarInfo/os.date
+    -- as extra upvalues on onPhysicsStep, which is already near vlua's 60-cap —
+    -- logToCSV already computed car/timestamp above, so this is free reuse.
+    EXT.car     = car
+    EXT.timeStr = timestamp:sub(12, 16)
 end
 
 -- Auto Testing
@@ -453,7 +513,7 @@ local function onPhysicsStep(dtPhys)
   if brakeState == "idle" then
     -- Guard: recordStartSpeed > 0 prevents spurious trigger when target not set
     -- Relaxed the speed check by 1 m/s so it still catches if Brake == Record exactly
-    if brakeInput > 0.05 and airspeed >= (recordStartSpeed - 1.0) and recordStartSpeed > 0 then
+    if EXT.detectorEnabled and brakeInput > 0.05 and airspeed >= (recordStartSpeed - 1.0) and recordStartSpeed > 0 then
       brakeState    = "waiting"
       forceUiUpdate = true
     end
@@ -465,6 +525,13 @@ local function onPhysicsStep(dtPhys)
       brakePrevPos       = obj:getPosition()
       measureElapsed     = 0
       brakeState         = "measuring"
+      EXT.actualStart        = airspeed
+      EXT.prevSpeedForDecel  = airspeed
+      EXT.decel     = {}
+      EXT.torqueFL  = {}
+      EXT.torqueFR  = {}
+      EXT.torqueRL  = {}
+      EXT.torqueRR  = {}
       -- [GEAR/RPM 2026-08-26 per Blake] snapshot drivetrain state at measurement start so
       -- runs are comparable ("are we comparing similar cars"). Stored in LT (upvalue cap).
       LT.gear = tostring(electrics.values.gear or "?")
@@ -533,6 +600,18 @@ local function onPhysicsStep(dtPhys)
       dsAccum[slot] = dsAccum[slot] + t
     end
     dsSteps = dsSteps + 1
+
+    -- HUD sparkline samples (decorative shape only — reuses currentTorques
+    -- already computed above, and a plain velocity derivative for decel).
+    EXT.torqueFL[#EXT.torqueFL + 1] = currentTorques[1]
+    EXT.torqueFR[#EXT.torqueFR + 1] = currentTorques[2]
+    EXT.torqueRL[#EXT.torqueRL + 1] = currentTorques[3]
+    EXT.torqueRR[#EXT.torqueRR + 1] = currentTorques[4]
+    if EXT.prevSpeedForDecel and dtPhys > 0 then
+      local instDecelG = (EXT.prevSpeedForDecel - airspeed) / dtPhys / 9.81
+      EXT.decel[#EXT.decel + 1] = instDecelG
+    end
+    EXT.prevSpeedForDecel = airspeed
     
     if telemetryRateHz > 0 and telemetryFile then
       telemetryTimer = telemetryTimer + dtPhys
@@ -611,7 +690,10 @@ local function onPhysicsStep(dtPhys)
         lastBrakeDistArc    = distArc
         lastBrakeDuration   = measureElapsed
         lastBrakeStartSpeed = recordStartSpeed
-        
+        -- Sparkline paths are NOT built here — deliberately deferred to
+        -- updateGFX (see there) so onPhysicsStep doesn't gain buildSparkPath
+        -- as an extra upvalue on top of everything else it already closes over.
+
         if measureSteps > 0 then
           lastAvgSteerAngle = (accumSteer / measureSteps)
           lastAvgWheelAngle = (accumWheelAngle / measureSteps) * (180 / math.pi)
@@ -668,9 +750,10 @@ local function updateGFX(dtSim)
   end
 
   local p = {
-    state      = brakeState,
-    target_mph = uiTargetMph,
-    auto_state = autoState,
+    state             = brakeState,
+    target_mph        = uiTargetMph,
+    auto_state        = autoState,
+    detector_enabled  = EXT.detectorEnabled,
   }
 
   if lastBrakeDist ~= nil then
@@ -682,9 +765,19 @@ local function updateGFX(dtSim)
       p.arc_dist_ft   = string.format("%.1f",  lastBrakeDistArc * 3.28084)
       p.arc_avg_g     = string.format("%.3f",  lastBrakeAvgGArc)
     end
-    p.duration_s      = string.format("%.2f",  lastBrakeDuration)
-    p.start_speed_mph = string.format("%.1f",  lastBrakeStartSpeed * 2.23694)
-    
+    p.duration_s        = string.format("%.2f",  lastBrakeDuration)
+    p.start_speed_mph   = string.format("%.1f",  lastBrakeStartSpeed * 2.23694)
+    p.actual_start_mph  = string.format("%.2f",  EXT.actualStart * 2.23694)
+    p.car               = EXT.car
+    p.time_str          = EXT.timeStr
+    -- Built here rather than in onPhysicsStep (upvalue-cap headroom, see the
+    -- EXT comment) — cheap (14-point downsample) even recomputed every push.
+    p.decel_path        = buildSparkPath(EXT.decel)
+    p.torque_fl_path    = buildSparkPath(EXT.torqueFL)
+    p.torque_fr_path    = buildSparkPath(EXT.torqueFR)
+    p.torque_rl_path    = buildSparkPath(EXT.torqueRL)
+    p.torque_rr_path    = buildSparkPath(EXT.torqueRR)
+
     if lastAvgSteerAngle ~= nil then
       p.turning_enabled = turningEnabled
       p.avg_steer_input = string.format("%.2f", lastAvgSteerAngle)
@@ -752,6 +845,17 @@ end
 
 local function setTurningEnabled(enabled)
   turningEnabled = enabled
+  forceUiUpdate = true
+end
+
+-- Click-to-disable the passive detector (HUD status square). Disabling mid-run
+-- aborts it immediately, same as releasing the brake would.
+local function setDetectorEnabled(enabled)
+  EXT.detectorEnabled = enabled and true or false
+  if not EXT.detectorEnabled and brakeState ~= "idle" then
+    brakeState         = "idle"
+    brakeStartPosition = nil
+  end
   forceUiUpdate = true
 end
 
@@ -825,6 +929,7 @@ M.onReset           = onReset
 M.setTestParams     = setTestParams
 M.setSteerParams    = setSteerParams
 M.setTurningEnabled = setTurningEnabled
+M.setDetectorEnabled = setDetectorEnabled
 M.setAutoTestEnabled = setAutoTestEnabled
 M.setTelemetryHz    = setTelemetryHz
 M.toggleAutoTestRun = toggleAutoTestRun

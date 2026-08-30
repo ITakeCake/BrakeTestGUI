@@ -6,49 +6,66 @@ angular.module('beamng.apps')
     restrict: 'EA',
     controller: ['$scope', function ($scope) {
 
-      // All display values are pre-formatted strings pushed from Lua.
-      // JS performs zero calculations on these values.
-      $scope.btData = {
-        state:           'idle',
-        target_mph:      '--',
-        dist_m:          null,   // null = result block hidden via ng-if; this is the true 2kHz value
-        dist_ft:         null,
-        avg_g:           null,
-        arc_dist_m:      null,
-        arc_dist_ft:     null,
-        arc_avg_g:       null,
-        duration_s:      null,
-        start_speed_mph: null,
+      var LUA_PREFIX = 'if not brakeTestUI then extensions.load("brakeTestUI") end; ';
+      var NEVER = 'M 0 10 L 100 10';
+
+      // All display numbers are pre-formatted strings pushed from Lua.
+      // JS performs zero calculations on them.
+      $scope.data = {
+        state: 'idle',
+        target_mph: '--',
+        auto_state: 'idle',
+        detector_enabled: true,
+        dist_m: null, dist_ft: null, avg_g: null,
+        arc_dist_m: null, arc_dist_ft: null, arc_avg_g: null,
+        duration_s: null, start_speed_mph: null, actual_start_mph: null,
+        car: null, time_str: null,
+        decel_path: NEVER,
+        torque_fl_path: NEVER, torque_fr_path: NEVER, torque_rl_path: NEVER, torque_rr_path: NEVER,
         turning_enabled: false,
-        avg_steer_input: null,
-        avg_wheel_angle: null,
-        understeer:      null,
-        achieved_yaw:    null
+        avg_steer_input: null, avg_wheel_angle: null, understeer: null, achieved_yaw: null, acs_score: null,
+        bf_avg: null, bf_max: null, bf_min: null
       };
+
+      $scope.activeTab = 'main';
+
+      // Config (what THIS TEST is — saved per slot)
       $scope.btInputBrakeMph = null;
       $scope.btInputRecordMph = null;
       $scope.btInputCoastMph = 2.0;
-      $scope.btInputSteerAmt = 0.0;
-      // Single absolute trigger speed. 0 = steering never engages.
-      // Lua takes exactly one number (setSteerParams trigger); the old
-      // before/after mode only changed how the UI computed it.
-      $scope.btInputSteerAtMph = 0.0;
       $scope.btEnableTurning = false;
+      $scope.btInputSteerAmt = 0.0;
+      $scope.btInputSteerAtMph = 0.0;
+
+      // Settings (how the APP behaves — global, never in a slot)
       $scope.btAutoTest = false;
-      // Settings panel collapsed by default — HUD shows only the live readout.
-      // Toggled by the gear button; ng-show in the template keeps all ng-model
-      // bindings on this scope (ng-if would shadow the primitives in a child scope).
-      $scope.showSettings = false;
+      $scope.btInputTelemetryHz = 0;
 
-      // Ensure the GE bridge extension is loaded. BeamNG does not auto-execute
-      // GE extensions from Unpacked mods; extensions.load() makes it a live global.
-      bngApi.engineLua('extensions.load("brakeTestUI")');
+      // HUD opacity is a pure display preference — persisted per-browser-profile
+      // like the presets' localStorage layer, no Lua involved.
+      $scope.hudOpacity = parseInt(window.localStorage.getItem('brakeTestHudOpacity'), 10);
+      if (isNaN($scope.hudOpacity)) $scope.hudOpacity = 72;
 
-      var LUA_PREFIX = 'if not brakeTestUI then extensions.load("brakeTestUI") end; ';
+      // Presets 1-8
+      $scope.presets = JSON.parse(window.localStorage.getItem('brakeTestPresets') || '{}');
+      $scope.activeSlot = 1;
+      $scope.slots = [1, 2, 3, 4, 5, 6, 7, 8];
 
-      // Reads every input, clamps it, writes the clamped value back to the
-      // field, and returns the numbers Lua needs. Returns null when Brake at
-      // is unset (nothing valid to push).
+      // History
+      $scope.historyRows = [];
+      $scope.historyShowLast = 20;
+      $scope.historyDeletePast = 200;
+
+      $scope.setTab = function (tab) {
+        $scope.activeTab = tab;
+        if (tab === 'history') $scope.refreshHistory();
+      };
+
+      // ------------------------------------------------------------------
+      // Config / Settings push — the ONE place that talks to Lua about
+      // parameters, so Apply / Start-run / preset-load / vehicle-switch can
+      // never disagree with each other.
+      // ------------------------------------------------------------------
       function readClampedParams() {
         var brakeMph = parseFloat($scope.btInputBrakeMph);
         if (isNaN(brakeMph) || brakeMph <= 0) return null;
@@ -67,8 +84,6 @@ angular.module('beamng.apps')
         if (steerAmt < -1) steerAmt = -1;
         if (steerAmt > 1) steerAmt = 1;
 
-        // Steering can engage any time during coast or braking, so the
-        // highest useful trigger is the speed the car lifts at.
         var steerAtMph = parseFloat($scope.btInputSteerAtMph) || 0;
         var steerAtMax = brakeMph + coastMph;
         if (steerAtMph < 0) steerAtMph = 0;
@@ -78,9 +93,9 @@ angular.module('beamng.apps')
         if (telemetryHz < 0) telemetryHz = 0;
         if (telemetryHz > 2000) telemetryHz = 2000;
 
-        $scope.btInputRecordMph  = recordMph;
-        $scope.btInputCoastMph   = coastMph;
-        $scope.btInputSteerAmt   = steerAmt;
+        $scope.btInputRecordMph = recordMph;
+        $scope.btInputCoastMph = coastMph;
+        $scope.btInputSteerAmt = steerAmt;
         $scope.btInputSteerAtMph = steerAtMph;
         $scope.btInputTelemetryHz = telemetryHz;
 
@@ -90,8 +105,6 @@ angular.module('beamng.apps')
         };
       }
 
-      // The ONE place that sends settings to Lua. Used by Apply, START RUN,
-      // preset load, and vehicle focus change so they can never disagree.
       $scope.pushAllParams = function () {
         var p = readClampedParams();
         if (p) {
@@ -102,49 +115,18 @@ angular.module('beamng.apps')
         }
         bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setTurningEnabled(' + ($scope.btEnableTurning ? 'true' : 'false') + ')');
         // Deliberately NOT setAutoTestEnabled here: Lua resets autoState to
-        // "finished" on every call, which would abort a run in progress when
-        // START/STOP RUN re-pushes params. Only toggleAutoTest sends it.
+        // "finished" on every call, which would abort a run in progress.
       };
 
-      $scope.applySettings = function () { $scope.pushAllParams(); };
-
-      // Receive Lua push (5Hz + immediate on state change)
-      $scope.$on('brakeTestUpdate', function (event, data) {
-        $scope.$evalAsync(function () {
-          $scope.btData.state      = data.state      || 'idle';
-          $scope.btData.target_mph = data.target_mph || '--';
-          // Lua only includes result fields after a test completes.
-          // Don't overwrite with undefined — preserve last displayed result.
-          if (data.dist_m !== undefined) {
-            $scope.btData.dist_m          = data.dist_m;
-            $scope.btData.dist_ft         = data.dist_ft;
-            $scope.btData.avg_g           = data.avg_g;
-            if (data.arc_dist_m !== undefined) {
-              $scope.btData.arc_dist_m    = data.arc_dist_m;
-              $scope.btData.arc_dist_ft   = data.arc_dist_ft;
-              $scope.btData.arc_avg_g     = data.arc_avg_g;
-            }
-            $scope.btData.duration_s      = data.duration_s;
-            $scope.btData.start_speed_mph = data.start_speed_mph;
-            $scope.btData.turning_enabled = data.turning_enabled || false;
-            if ($scope.btData.turning_enabled) {
-              $scope.btData.avg_steer_input = data.avg_steer_input;
-              $scope.btData.avg_wheel_angle = data.avg_wheel_angle;
-              $scope.btData.understeer      = data.understeer;
-              $scope.btData.achieved_yaw    = data.achieved_yaw;
-            }
-          }
-        });
-      });
+      $scope.applyConfig = function () { $scope.pushAllParams(); };
 
       $scope.toggleTurning = function () {
         bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setTurningEnabled(' + ($scope.btEnableTurning ? 'true' : 'false') + ')');
       };
 
       $scope.toggleAutoTest = function () {
-        // Turning off automation also turns off scripted steering: Lua only
-        // applies it inside the automated state machine, so leaving the box
-        // checked would be a lie.
+        // Scripted steering only ever runs inside the auto-driver's state
+        // machine, so leaving it checked with automation off would be a lie.
         if (!$scope.btAutoTest && $scope.btEnableTurning) {
           $scope.btEnableTurning = false;
           $scope.toggleTurning();
@@ -157,87 +139,194 @@ angular.module('beamng.apps')
         bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.toggleAutoTestRun()');
       };
 
-      // Memory System Logic (Double-layer: LocalStorage + File)
-      $scope.presets = JSON.parse(window.localStorage.getItem('brakeTestPresets') || '{}');
-      $scope.saveMode = false;
+      $scope.isRunning = function () {
+        var s = $scope.data.auto_state;
+        return s === 'accelerating' || s === 'holding' || s === 'coasting' || s === 'braking';
+      };
 
-      // Ask Lua to load the file backup immediately
-      bngApi.engineLua('if not brakeTestUI then extensions.load("brakeTestUI") end; brakeTestUI.requestPresets()');
+      // Status square: reports the passive detector's state, never toggled by
+      // a click into a fake state — clicking it calls the real Lua setter and
+      // waits for the next payload to confirm.
+      $scope.toggleDetector = function () {
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setDetectorEnabled(' + (!$scope.data.detector_enabled ? 'true' : 'false') + ')');
+      };
+
+      $scope.detectorSquareClass = function () {
+        if (!$scope.data.detector_enabled) return 'state-off';
+        if ($scope.data.state === 'measuring') return 'state-recording';
+        if ($scope.data.dist_m && $scope.data.state === 'idle') return 'state-done';
+        return 'state-waiting';
+      };
+
+      // ------------------------------------------------------------------
+      // Presets — slot picker + explicit Save, no separate "arm save mode"
+      // step. Same dual-layer persistence (localStorage + file) as before.
+      // ------------------------------------------------------------------
+      $scope.setSlot = function (i) {
+        $scope.activeSlot = i;
+        var p = $scope.presets[i];
+        if (!p) return;
+        $scope.btInputBrakeMph  = parseFloat(p.brake)  || 0;
+        $scope.btInputRecordMph = parseFloat(p.record) || 0;
+        $scope.btInputCoastMph  = parseFloat(p.coast)  || 0;
+        $scope.btInputSteerAmt  = parseFloat(p.steer)  || 0;
+        $scope.btInputSteerAtMph = parseFloat(p.steerAt) || 0;
+        $scope.btInputTelemetryHz = parseFloat(p.telemetryHz) || 0;
+        $scope.btAutoTest      = (p.autoTest === true || p.autoTest === 'true');
+        $scope.btEnableTurning = $scope.btAutoTest && (p.turnEnabled === true || p.turnEnabled === 'true');
+        $scope.pushAllParams();
+        $scope.toggleAutoTest();
+      };
+
+      $scope.saveToSlot = function () {
+        $scope.presets[$scope.activeSlot] = {
+          brake: $scope.btInputBrakeMph,
+          record: $scope.btInputRecordMph,
+          coast: $scope.btInputCoastMph,
+          steer: $scope.btInputSteerAmt,
+          steerAt: $scope.btInputSteerAtMph,
+          turnEnabled: $scope.btEnableTurning,
+          autoTest: $scope.btAutoTest,
+          telemetryHz: $scope.btInputTelemetryHz
+        };
+        var jsonStr = JSON.stringify($scope.presets);
+        window.localStorage.setItem('brakeTestPresets', jsonStr);
+        var escapedJson = jsonStr.replace(/'/g, "\\'");
+        bngApi.engineLua(LUA_PREFIX + "brakeTestUI.savePresets('" + escapedJson + "')");
+      };
+
+      bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.requestPresets()');
 
       $scope.$on('BrakeTest_OnPresetsLoaded', function (event, dataStr) {
-        if (dataStr && dataStr !== "{}") {
+        if (dataStr && dataStr !== '{}') {
           try {
             $scope.presets = JSON.parse(dataStr);
             window.localStorage.setItem('brakeTestPresets', dataStr);
             $scope.$applyAsync();
-          } catch(e) {}
+          } catch (e) {}
         }
       });
 
-      $scope.toggleSaveMode = function() {
-        $scope.saveMode = !$scope.saveMode;
+      // ------------------------------------------------------------------
+      // History
+      // ------------------------------------------------------------------
+      $scope.refreshHistory = function () {
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.requestHistory(' + (parseInt($scope.historyShowLast, 10) || 20) + ')');
       };
 
-      $scope.memoryClick = function(idx) {
-        if ($scope.saveMode) {
-          $scope.presets[idx] = {
-            brake:       $scope.btInputBrakeMph,
-            record:      $scope.btInputRecordMph,
-            coast:       $scope.btInputCoastMph,
-            steer:       $scope.btInputSteerAmt,
-            steerAt:     $scope.btInputSteerAtMph,
-            turnEnabled: $scope.btEnableTurning,
-            autoTest:    $scope.btAutoTest,
-            telemetryHz: $scope.btInputTelemetryHz
-          };
-          var jsonStr = JSON.stringify($scope.presets);
-          window.localStorage.setItem('brakeTestPresets', jsonStr);
-
-          // Write to dedicated file backup
-          var escapedJson = jsonStr.replace(/'/g, "\\'");
-          bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.savePresets(\'' + escapedJson + '\')');
-
-          $scope.saveMode = false;
-        } else {
-          var p = $scope.presets[idx];
-          if (p) {
-            $scope.btInputBrakeMph  = parseFloat(p.brake)  || 0;
-            $scope.btInputRecordMph = parseFloat(p.record) || 0;
-            $scope.btInputCoastMph  = parseFloat(p.coast)  || 0;
-            $scope.btInputSteerAmt  = parseFloat(p.steer)  || 0;
-            $scope.btInputTelemetryHz = parseFloat(p.telemetryHz) || 0;
-
-            if (p.steerAt !== undefined) {
-              $scope.btInputSteerAtMph = parseFloat(p.steerAt) || 0;
-            } else {
-              // Presets saved before Steer at existed stored a mode plus
-              // either an offset above Record (before) or an absolute speed (after).
-              var rec = parseFloat(p.record) || 0;
-              if (p.mode === 'before') {
-                $scope.btInputSteerAtMph = rec + (parseFloat(p.offset) || 0);
-              } else {
-                $scope.btInputSteerAtMph = parseFloat(p.speed) || 0;
-              }
-            }
-
-            $scope.btAutoTest      = (p.autoTest === true || p.autoTest === 'true');
-            $scope.btEnableTurning = $scope.btAutoTest && (p.turnEnabled === true || p.turnEnabled === 'true');
-
-            $scope.pushAllParams();
-            $scope.toggleAutoTest();   // arms/disarms Lua automation to match the loaded preset
+      $scope.$on('BrakeTest_OnHistoryLoaded', function (event, rows) {
+        $scope.$evalAsync(function () {
+          rows = rows || [];
+          var bestIdx = -1, bestDist = Infinity;
+          for (var i = 0; i < rows.length; i++) {
+            var d = parseFloat(rows[i].dist);
+            if (!isNaN(d) && d < bestDist) { bestDist = d; bestIdx = i; }
+            rows[i].isBest = false;
           }
-        }
+          if (bestIdx >= 0) rows[bestIdx].isBest = true;
+          $scope.historyRows = rows;
+        });
+      });
+
+      $scope.deleteOldestPast = function () {
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.trimHistory(' + (parseInt($scope.historyDeletePast, 10) || 200) + ')');
+        $scope.refreshHistory();
       };
 
-      // On vehicle focus change: re-push current target to new vehicle,
-      // clear stale result display (results belong to the previous vehicle).
+      // ------------------------------------------------------------------
+      // HUD opacity — applied as CSS custom properties on the root element.
+      // ------------------------------------------------------------------
+      $scope.updateHudOpacity = function () {
+        var val = parseInt($scope.hudOpacity, 10);
+        if (isNaN(val)) val = 72;
+        if (val < 0) val = 0;
+        if (val > 100) val = 100;
+        $scope.hudOpacity = val;
+        window.localStorage.setItem('brakeTestHudOpacity', String(val));
+      };
+
+      // Coefficients tuned so 72% (the shipped default) reproduces the fixed
+      // values the panel used before this slider existed.
+      $scope.hudRootStyle = function () {
+        var a = ($scope.hudOpacity || 0) / 100;
+        return {
+          background: 'rgba(18, 22, 28, ' + a.toFixed(2) + ')',
+          borderColor: 'rgba(255, 255, 255, ' + (a * 0.1667).toFixed(3) + ')',
+          boxShadow: '0 8px 28px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, ' + (a * 0.111).toFixed(3) + ')'
+        };
+      };
+      $scope.hudTileStyle = function () {
+        var a = ($scope.hudOpacity || 0) / 100;
+        return {
+          background: 'rgba(255, 255, 255, ' + (a * 0.065).toFixed(3) + ')',
+          borderColor: 'rgba(255, 255, 255, ' + (a * 0.125).toFixed(3) + ')',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, ' + (a * 0.083).toFixed(3) + ')'
+        };
+      };
+      $scope.hudNavStyle = function () {
+        var a = ($scope.hudOpacity || 0) / 100;
+        return {
+          background: 'rgba(0, 0, 0, ' + (a * 0.52).toFixed(3) + ')',
+          borderTopColor: 'rgba(255, 255, 255, ' + (a * 0.0972).toFixed(3) + ')'
+        };
+      };
+
+      // ------------------------------------------------------------------
+      // Live data from Lua
+      // ------------------------------------------------------------------
+      bngApi.engineLua('extensions.load("brakeTestUI")');
+
+      $scope.$on('brakeTestUpdate', function (event, data) {
+        $scope.$evalAsync(function () {
+          $scope.data.state            = data.state || 'idle';
+          $scope.data.target_mph       = data.target_mph || '--';
+          $scope.data.auto_state       = data.auto_state || 'idle';
+          $scope.data.detector_enabled = data.detector_enabled !== false;
+
+          if (data.dist_m !== undefined) {
+            $scope.data.dist_m = data.dist_m;
+            $scope.data.dist_ft = data.dist_ft;
+            $scope.data.avg_g = data.avg_g;
+            if (data.arc_dist_m !== undefined) {
+              $scope.data.arc_dist_m = data.arc_dist_m;
+              $scope.data.arc_dist_ft = data.arc_dist_ft;
+              $scope.data.arc_avg_g = data.arc_avg_g;
+            }
+            $scope.data.duration_s = data.duration_s;
+            $scope.data.start_speed_mph = data.start_speed_mph;
+            $scope.data.actual_start_mph = data.actual_start_mph;
+            $scope.data.car = data.car;
+            $scope.data.time_str = data.time_str;
+            $scope.data.decel_path = data.decel_path || NEVER;
+            $scope.data.torque_fl_path = data.torque_fl_path || NEVER;
+            $scope.data.torque_fr_path = data.torque_fr_path || NEVER;
+            $scope.data.torque_rl_path = data.torque_rl_path || NEVER;
+            $scope.data.torque_rr_path = data.torque_rr_path || NEVER;
+
+            $scope.data.turning_enabled = data.turning_enabled || false;
+            if ($scope.data.turning_enabled) {
+              $scope.data.avg_steer_input = data.avg_steer_input;
+              $scope.data.avg_wheel_angle = data.avg_wheel_angle;
+              $scope.data.understeer = data.understeer;
+              $scope.data.achieved_yaw = data.achieved_yaw;
+              $scope.data.acs_score = data.acs_score;
+            }
+            if (data.bf_avg) {
+              $scope.data.bf_avg = data.bf_avg;
+              $scope.data.bf_max = data.bf_max;
+              $scope.data.bf_min = data.bf_min;
+            }
+          }
+        });
+      });
+
       $scope.$on('VehicleFocusChanged', function () {
         $scope.pushAllParams();
         if ($scope.btAutoTest) {
           bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setAutoTestEnabled(true)');
         }
         $scope.$evalAsync(function () {
-          $scope.btData.dist_m = null;
+          $scope.data.dist_m = null;
         });
       });
 

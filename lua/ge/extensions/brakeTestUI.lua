@@ -15,8 +15,22 @@ local cachedSteerAmt = 0
 local cachedSteerTriggerMs = 0
 local cachedTurningEnabled = false
 local cachedTelemetryHz = 0
+local cachedDetectorEnabled = true
 
 local PRESET_FILE = "settings/brakeTestMod_presets.json"
+local HISTORY_FILE = "BrakeTestResults_Straight.csv"
+
+-- Same relative-path root as vehicle Lua (both resolve to the userpath's
+-- current/ folder) — confirmed empirically: PRESET_FILE above already reads
+-- from there successfully, and BrakeTestResults_Straight.csv (written by
+-- vehicle Lua's brakeTest.lua) lives in that same folder.
+local function splitCSVLine(line)
+  local fields = {}
+  for field in (line .. ","):gmatch("(.-),") do
+    fields[#fields + 1] = field
+  end
+  return fields
+end
 
 local function savePresets(jsonStr)
   local f = io.open(PRESET_FILE, "w")
@@ -36,6 +50,73 @@ local function requestPresets()
   guihooks.trigger('BrakeTest_OnPresetsLoaded', dataStr)
 end
 
+-- Reads the real run log for the History tab. First pass: re-reads the whole
+-- CSV each call (271 rows today, trivial) rather than maintaining a separate
+-- index — fine at this size, worth revisiting if the log grows large.
+-- Column layout is logToCSV()'s header in brakeTest.lua; this must be kept
+-- in sync with it by hand (no shared schema between the two files).
+local function requestHistory(limit)
+  limit = tonumber(limit) or 20
+  local lines = {}
+  local f = io.open(HISTORY_FILE, "r")
+  if f then
+    for line in f:lines() do
+      lines[#lines + 1] = line
+    end
+    f:close()
+  end
+
+  local rows = {}
+  -- lines[1] is the header; walk backward for most-recent-first
+  for i = #lines, 2, -1 do
+    if #rows >= limit then break end
+    local fld = splitCSVLine(lines[i])
+    if fld[4] then
+      rows[#rows + 1] = {
+        car  = fld[4]  or "?",
+        from = fld[8]  or "0",
+        dist = fld[17] or fld[14] or "0",  -- True Path (m); chord as fallback
+        g    = fld[19] or fld[16] or "0",  -- True Path Avg G; chord as fallback
+        time = (fld[1] or ""):sub(12, 16), -- "HH:MM" out of "YYYY-MM-DD HH:MM:SS"
+      }
+    end
+  end
+  guihooks.trigger('BrakeTest_OnHistoryLoaded', rows)
+end
+
+-- "Delete oldest past N" — keeps the newest `keepCount` rows. Backs up the
+-- untrimmed file first (park, don't discard — see project convention) rather
+-- than truly deleting old runs.
+local function trimHistory(keepCount)
+  keepCount = tonumber(keepCount) or 200
+  local lines = {}
+  local f = io.open(HISTORY_FILE, "r")
+  if not f then return end
+  for line in f:lines() do
+    lines[#lines + 1] = line
+  end
+  f:close()
+
+  local dataCount = #lines - 1  -- excluding header
+  if dataCount <= keepCount then return end
+
+  local backupName = HISTORY_FILE .. ".BAK_" .. os.date("%Y%m%d_%H%M%S")
+  local bak = io.open(backupName, "w")
+  if bak then
+    for _, line in ipairs(lines) do bak:write(line, "\n") end
+    bak:close()
+  end
+
+  local out = io.open(HISTORY_FILE, "w")
+  if not out then return end
+  out:write(lines[1], "\n")  -- header
+  local firstKept = #lines - keepCount + 1
+  for i = firstKept, #lines do
+    out:write(lines[i], "\n")
+  end
+  out:close()
+end
+
 
 local function pushTargetToVehicle(veh)
   if not veh then return end
@@ -43,6 +124,7 @@ local function pushTargetToVehicle(veh)
   veh:queueLuaCommand(string.format("extensions.brakeTest.setSteerParams(%f, %f)", cachedSteerAmt, cachedSteerTriggerMs))
   veh:queueLuaCommand(string.format("extensions.brakeTest.setTurningEnabled(%s)", tostring(cachedTurningEnabled)))
   veh:queueLuaCommand(string.format("extensions.brakeTest.setTelemetryHz(%d)", cachedTelemetryHz))
+  veh:queueLuaCommand(string.format("extensions.brakeTest.setDetectorEnabled(%s)", tostring(cachedDetectorEnabled)))
 end
 
 
@@ -103,6 +185,14 @@ local function setTelemetryHz(hz)
   pushTargetToVehicle(be:getPlayerVehicle(0))
 end
 
+local function setDetectorEnabled(enabled)
+  cachedDetectorEnabled = enabled and true or false
+  local veh = be:getPlayerVehicle(0)
+  if veh then
+    veh:queueLuaCommand(string.format("extensions.brakeTest.setDetectorEnabled(%s)", tostring(cachedDetectorEnabled)))
+  end
+end
+
 local function setAutoTestEnabled(enabled)
   local veh = be:getPlayerVehicle(0)
   if veh then
@@ -128,5 +218,8 @@ M.setAutoTestEnabled = setAutoTestEnabled
 M.toggleAutoTestRun = toggleAutoTestRun
 M.savePresets = savePresets
 M.requestPresets = requestPresets
+M.setDetectorEnabled = setDetectorEnabled
+M.requestHistory = requestHistory
+M.trimHistory = trimHistory
 
 return M

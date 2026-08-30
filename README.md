@@ -11,11 +11,24 @@ from the DynamicABS mod family since it has no dependency on ABS-controller inte
 - `lua/ge/extensions/absCmdChannel.lua` — command channel used by the automation/telemetry side
 - `ui/modules/apps/BrakeTest/` — the in-game Angular HUD app
 
-## Settings explained
+## HUD layout
 
-Full table with the Lua line each control maps to: [docs/GUI_TERMINOLOGY.md](docs/GUI_TERMINOLOGY.md).
+Five tabs — full table with the Lua line each control maps to: [docs/GUI_TERMINOLOGY.md](docs/GUI_TERMINOLOGY.md).
 
-Short version — an automated run does: accelerate to **Brake at + Coast margin** → lift and
+- **Main** — always-visible state + last result. Distance is true-path only; a status
+  square (top-right of Speed gates) shows the passive detector's state (waiting/recording/
+  done/off) and **doubles as a real on/off switch** — click it to disable/re-enable the
+  detector, not just to look at it.
+- **Config** — what *this test* is (Record from / Brake at / Coast margin / Scripted
+  steering), saved into one of 8 slots.
+- **Settings** — how the *app* behaves, global and never saved into a slot: Auto-driver
+  on/off, Telemetry Hz, HUD opacity, History query defaults.
+- **Details** — everything Lua sends that Main has no room for: chord vs. true-path,
+  steering breakdown, per-wheel brake-torque grid with real sparklines.
+- **History** — real past runs read from `BrakeTestResults_Straight.csv`, with a safe
+  (backup-before-truncate) trim control.
+
+Short version of an automated run: accelerate to **Brake at + Coast margin** → lift and
 coast → full brake at **Brake at** → measurement window opens at **Record from** → stop.
 **Scripted steering** (automated runs only) holds **Steer amount** from the moment speed
 drops to **Steer at** until the car stops. Set Steer at ≥ Record from to have the wheel
@@ -48,4 +61,6 @@ Full writeup: [Issue #1 — Issues with some current designs](https://github.com
 ## Known issues
 
 See the [Issues tab](https://github.com/ITakeCake/BrakeTestGUI/issues) — starting with the
-frame-rate-tied speed sampling above and a planned tolerance-error output for the GUI.
+frame-rate-tied speed sampling above. Issue #2 (a tolerance-error output for start-speed
+accuracy) can now build on the real `actual_start_mph` field added in the HUD overhaul,
+which wasn't available when that issue was filed.
