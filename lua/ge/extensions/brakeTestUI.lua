@@ -137,9 +137,6 @@ local function onExtensionLoaded()
   if veh then
     veh:queueLuaCommand("extensions.load('brakeTest')")
   end
-  -- Bring up the file command channel so an external process can drive runs.
-  -- Safe if absent or if loading fails.
-  pcall(function() extensions.load('absCmdChannel') end)
 end
 
 
