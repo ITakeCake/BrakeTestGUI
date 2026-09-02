@@ -45,6 +45,7 @@ angular.module('beamng.apps')
       // Settings: how the app behaves. Global, never saved per slot.
       $scope.btAutoTest = false;
       $scope.btInputTelemetryHz = 0;
+      $scope.csvEnabled = window.localStorage.getItem('brakeTestCsvEnabled') !== 'false';
 
       // Display-only preference, persisted in localStorage. No Lua involved.
       $scope.hudOpacity = parseInt(window.localStorage.getItem('brakeTestHudOpacity'), 10);
@@ -160,6 +161,12 @@ angular.module('beamng.apps')
       // waits for the next payload rather than assuming the new state.
       $scope.toggleDetector = function () {
         bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setDetectorEnabled(' + (!$scope.data.detector_enabled ? 'true' : 'false') + ')');
+      };
+
+      $scope.toggleCsvLogging = function () {
+        $scope.csvEnabled = !$scope.csvEnabled;
+        window.localStorage.setItem('brakeTestCsvEnabled', String($scope.csvEnabled));
+        bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setCsvEnabled(' + ($scope.csvEnabled ? 'true' : 'false') + ')');
       };
 
       $scope.detectorSquareClass = function () {
@@ -285,6 +292,7 @@ angular.module('beamng.apps')
       // Live data from Lua
       // ------------------------------------------------------------------
       bngApi.engineLua('extensions.load("brakeTestUI")');
+      if (!$scope.csvEnabled) bngApi.engineLua(LUA_PREFIX + 'brakeTestUI.setCsvEnabled(false)');
 
       $scope.$on('brakeTestUpdate', function (event, data) {
         $scope.$evalAsync(function () {

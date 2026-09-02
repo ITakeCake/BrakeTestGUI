@@ -82,6 +82,7 @@ local stopTimer       = 0
 
 -- HUD state, in one table for the same upvalue reason as LT above.
 --   detectorEnabled : passive detector on/off, toggled from the status square
+--   csvEnabled      : results CSV on/off. Off means History stays empty.
 --   actualStart     : real airspeed (m/s) at the waiting->measuring crossing.
 --                     recordStartSpeed is the target; this is what happened.
 --   decel/torque*   : per-run raw samples, downsampled to SVG paths at run end.
@@ -89,6 +90,7 @@ local stopTimer       = 0
 --   *Path/sparkDirty: built strings and their cache flag.
 local EXT = {
   detectorEnabled = true,
+  csvEnabled = true,
   actualStart = 0,
   prevSpeedForDecel = nil,
   decel = {}, torqueFL = {}, torqueFR = {}, torqueRL = {}, torqueRR = {},
@@ -107,17 +109,6 @@ local function getRunID()
     return id
 end
 local lastACS = 0
-
-local function writeDone(status)
-  local df = io.open("brake_done.txt", "w")
-  if df then
-    local dmg = ((beamstate and beamstate.damage) or 0) - (LT.dmg0 or 0)
-    df:write(string.format("runID=%s avg_g=%.4f dist_m=%.4f status=%s gear=%s rpm=%s dmg=%.0f\n",
-      tostring(currentRunID or "?"), lastBrakeAvgG or 0, lastBrakeDist or 0,
-      tostring(status), tostring(LT.gear or "?"), tostring(LT.rpm or 0), dmg))
-    df:close()
-  end
-end
 
 -- Compute Normalized ABS Cornering Score (ACS)
 local function computeACS(v_initial_ms, d_actual_m, a_long_g, a_lat_g)
@@ -215,28 +206,25 @@ local function getCarInfo()
     return car, trim
 end
 
+-- Labels the CSV with whichever ABS controller is loaded. Any controller whose
+-- name contains "abs" counts, so third-party ABS mods are picked up by name.
 local function getABSInfo()
     local absName = "Stock/Unknown"
     local absVersion = "N/A"
-    if controller and controller.getController then
-        local c1 = controller.getController("ABS_1FEX") or controller.getController("Blake_OldABS")
-        if c1 then
-            absName = "1FEX"
-            absVersion = c1.version or "1.01"
-        else
-            local c2 = controller.getController("Blake_ABS_2F") or controller.getController("Blake_2F_ex")
-            if c2 then
-                absName = "2FEX"
-                absVersion = c2.version or "N/A"
-            elseif controller.getController("abs") then
-                absName = "Stock ABS"
-            end
+    if not (controller and controller.getAllControllers) then return absName, absVersion end
+    if controller.getController("abs") then absName = "Stock ABS" end
+    for name, c in pairs(controller.getAllControllers() or {}) do
+        if type(name) == "string" and name ~= "abs" and name:lower():find("abs", 1, true) then
+            absName = name
+            absVersion = tostring((type(c) == "table" and c.version) or "N/A")
+            break
         end
     end
     return absName, absVersion
 end
 
 local function logToCSV(isCornering)
+    if not EXT.csvEnabled then return end
     local filename = isCornering and "BrakeTestResults_Cornering.csv" or "BrakeTestResults_Straight.csv"
     local file = io.open(filename, "r")
     local needsHeader = false
@@ -349,7 +337,6 @@ local function onPhysicsStep(dtPhys)
         autoState = "finished"
         applyInputs(0, 0, 0, 0)
         forceUiUpdate = true
-        LT.pend = "DAMAGED"  -- done-signal deferred until the car is truly stopped
       end
     end
 
@@ -365,7 +352,6 @@ local function onPhysicsStep(dtPhys)
           autoState = "finished"
           applyInputs(0, 0, 0, 0)
           forceUiUpdate = true
-          LT.pend = "WRONG_WAY"  -- done-signal deferred until the car is truly stopped
         end
       end
     end
@@ -462,10 +448,6 @@ local function onPhysicsStep(dtPhys)
         tgtCl = 0
         tgtSt = 0
         forceUiUpdate = true
-        -- Done-signal for the command channel. The car has been stopped ~2s with
-        -- the brake released, so every CSV is finalized. Written to current/ and
-        -- never into mods/, which would trigger a hot-reload.
-        writeDone("OK")
       end
 
     elseif autoState == "finished" then
@@ -475,19 +457,6 @@ local function onPhysicsStep(dtPhys)
       tgtBr = (airspeed > 0.5) and 1 or 0
       tgtCl = 1
       tgtSt = 0
-      -- Deferred abort signal: true velocity at or below 0.2 mph held for 1s.
-      if LT.pend then
-        if airspeed <= 0.09 then
-          LT.stopT = (LT.stopT or 0) + dtPhys
-          if LT.stopT >= 1.0 then
-            writeDone(LT.pend)
-            LT.pend = nil
-            LT.stopT = 0
-          end
-        else
-          LT.stopT = 0
-        end
-      end
     end
 
     applyInputs(tgtTh, tgtBr, tgtCl, tgtSt)
@@ -751,6 +720,7 @@ local function updateGFX(dtSim)
     target_mph        = uiTargetMph,
     auto_state        = autoState,
     detector_enabled  = EXT.detectorEnabled,
+    csv_enabled       = EXT.csvEnabled,
   }
 
   if lastBrakeDist ~= nil then
@@ -889,13 +859,11 @@ local function toggleAutoTestRun()
     LT.gearT = 1.7  -- first retry fires ~0.3s in if the initial shift below no-ops
     LT.dmg0 = (beamstate and beamstate.damage) or 0
     LT.minD = nil
-    -- Clear latched results so an unfinalized measurement cannot leak the
-    -- previous run's numbers into the done-signal.
+    -- Clear latched results so the HUD cannot show the previous run's numbers
+    -- against this run's ID.
     lastBrakeDist = nil
     lastBrakeAvgG = nil
     currentRunID = ""
-    LT.pend = nil
-    LT.stopT = 0
     forceUiUpdate = true
     -- Force an automatic box into Drive at run start; a vehicle reset can leave
     -- it in Park or Neutral with the throttle inert. Gear index: 1=P, -1/0/2=R/N/D.
@@ -908,6 +876,11 @@ end
 
 local function setTelemetryHz(hz)
   telemetryRateHz = hz or 0
+end
+
+local function setCsvEnabled(enabled)
+  EXT.csvEnabled = enabled and true or false
+  forceUiUpdate = true
 end
 
 -- px,py is a point on the line; dx,dy is the travel direction. The line runs
@@ -936,6 +909,7 @@ M.setTurningEnabled = setTurningEnabled
 M.setDetectorEnabled = setDetectorEnabled
 M.setAutoTestEnabled = setAutoTestEnabled
 M.setTelemetryHz    = setTelemetryHz
+M.setCsvEnabled     = setCsvEnabled
 M.toggleAutoTestRun = toggleAutoTestRun
 M.setBrakeLine      = setBrakeLine
 M.setDamageAllowed  = function(b) LT.dmgOk = b and true or false end

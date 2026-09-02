@@ -375,6 +375,7 @@
       </div>
       <div class="btTile">
         <div class="btTileLabel">Logging</div>
+        <div class="btField"><span>Write results CSV<small>off = History stays empty</small></span><button class="btSwitch" ng-class="{on: csvEnabled}" ng-click="toggleCsvLogging()"></button></div>
         <div class="btField"><span>Telemetry<small>Hz &middot; 0 = off</small></span><input type="number" min="0" max="2000" ng-model="btInputTelemetryHz" ng-change="pushAllParams()"></div>
       </div>
       <div class="btTile">
@@ -437,7 +438,7 @@
     <div class="btHistRow" ng-repeat="r in historyRows" ng-class="{best: r.isBest}">
       <span class="hc">{{ r.car }}</span><span class="hn">{{ r.from }}</span><span class="hn">{{ r.dist }} m</span><span class="hn">{{ r.g }}</span><span class="hn">{{ r.time }}</span>
     </div>
-    <div class="btHistEmpty" ng-if="!historyRows.length">No runs logged yet.</div>
+    <div class="btHistEmpty" ng-if="!historyRows.length">{{ csvEnabled ? 'No runs logged yet.' : 'Results CSV is off (Settings). New runs are not being logged.' }}</div>
     <div class="btHistFoot">
       <span>Show last <input type="number" min="1" max="25" ng-model="historyShowLast" ng-change="clampShowLast(); refreshHistory()"></span>
       <span>Delete oldest past <input type="number" min="1" ng-model="historyDeletePast"></span>

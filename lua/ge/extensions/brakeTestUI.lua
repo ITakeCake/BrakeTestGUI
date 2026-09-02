@@ -15,6 +15,7 @@ local cachedSteerTriggerMs = 0
 local cachedTurningEnabled = false
 local cachedTelemetryHz = 0
 local cachedDetectorEnabled = true
+local cachedCsvEnabled = true
 
 local PRESET_FILE = "settings/brakeTestMod_presets.json"
 local HISTORY_FILE = "BrakeTestResults_Straight.csv"
@@ -120,6 +121,7 @@ local function pushTargetToVehicle(veh)
   veh:queueLuaCommand(string.format("extensions.brakeTest.setTurningEnabled(%s)", tostring(cachedTurningEnabled)))
   veh:queueLuaCommand(string.format("extensions.brakeTest.setTelemetryHz(%d)", cachedTelemetryHz))
   veh:queueLuaCommand(string.format("extensions.brakeTest.setDetectorEnabled(%s)", tostring(cachedDetectorEnabled)))
+  veh:queueLuaCommand(string.format("extensions.brakeTest.setCsvEnabled(%s)", tostring(cachedCsvEnabled)))
 end
 
 
@@ -185,6 +187,14 @@ local function setDetectorEnabled(enabled)
   end
 end
 
+local function setCsvEnabled(enabled)
+  cachedCsvEnabled = enabled and true or false
+  local veh = be:getPlayerVehicle(0)
+  if veh then
+    veh:queueLuaCommand(string.format("extensions.brakeTest.setCsvEnabled(%s)", tostring(cachedCsvEnabled)))
+  end
+end
+
 local function setAutoTestEnabled(enabled)
   local veh = be:getPlayerVehicle(0)
   if veh then
@@ -223,6 +233,7 @@ M.toggleAutoTestRun = toggleAutoTestRun
 M.savePresets = savePresets
 M.requestPresets = requestPresets
 M.setDetectorEnabled = setDetectorEnabled
+M.setCsvEnabled = setCsvEnabled
 M.requestHistory = requestHistory
 M.trimHistory = trimHistory
 M.openHistoryFolder = openHistoryFolder
