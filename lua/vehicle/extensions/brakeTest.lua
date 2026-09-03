@@ -206,9 +206,7 @@ local function getCarInfo()
     return car, trim
 end
 
--- Labels the CSV with whichever ABS controller is loaded. Any controller whose
--- name contains "abs" counts, so third-party ABS mods are picked up by name.
-local function getABSInfo()
+local function getABSInfo()  -- any loaded controller named *abs* labels the CSV
     local absName = "Stock/Unknown"
     local absVersion = "N/A"
     if not (controller and controller.getAllControllers) then return absName, absVersion end
@@ -859,9 +857,7 @@ local function toggleAutoTestRun()
     LT.gearT = 1.7  -- first retry fires ~0.3s in if the initial shift below no-ops
     LT.dmg0 = (beamstate and beamstate.damage) or 0
     LT.minD = nil
-    -- Clear latched results so the HUD cannot show the previous run's numbers
-    -- against this run's ID.
-    lastBrakeDist = nil
+    lastBrakeDist = nil  -- stale numbers must not show under the new run ID
     lastBrakeAvgG = nil
     currentRunID = ""
     forceUiUpdate = true
